@@ -22,10 +22,9 @@
     <main class="shell">
       <header class="masthead">
         <p class="eyebrow">AI REPPO</p>
-        <h1>Talk. It builds the datanet.</h1>
+        <h1>Create a datanet in real time.</h1>
         <p class="lede">
-          Click the orb, say what market you want, and AI REPPO will map the
-          datanet, search for data supply, and propose an RL bootstrap path when needed.
+          AI REPPO interviews you, defines the task, sets the publish fee, and opens the datanet for publishers and VeReppo voters.
         </p>
       </header>
 
@@ -38,11 +37,17 @@
         </button>
 
         <div class="orb-copy">
-          <p class="orb-kicker">Voice interface</p>
+          <p class="orb-kicker">Operator</p>
           <h2>AI REPPO</h2>
           <p id="voice-status" class="voice-status">
             Idle. Click the orb, then say “Hey Reppo” or just start talking.
           </p>
+          <div class="prompt-hint">
+            <span class="prompt-hint-label">Current question</span>
+            <p id="current-question" class="current-question">
+              Do you already know what a datanet is?
+            </p>
+          </div>
         </div>
 
         <form id="text-form" class="command-bar">
@@ -50,28 +55,42 @@
             id="text-input"
             type="text"
             autocomplete="off"
-            placeholder='Try: "Create a datanet for EV charging uptime with a 2 USDC publishing fee."'
+            placeholder='Try: "No, what is a datanet?" or "Create a datanet for EV charging uptime."'
           />
-          <button type="submit">Run</button>
+          <button type="submit">Send</button>
         </form>
       </section>
 
       <section class="workbench">
         <div class="panel response-panel">
-          <p class="panel-label">AI REPPO response</p>
+          <p class="panel-label">Response</p>
           <p id="response-text" class="response-text">
             I’m ready. Ask me to create a datanet, find datasets, or design an RL environment.
           </p>
+          <div class="voice-row">
+            <span class="voice-chip">Voice</span>
+            <span id="voice-name" class="voice-name">Natural system voice if available</span>
+          </div>
         </div>
 
         <div class="panel steps-panel">
-          <p class="panel-label">Showing work</p>
+          <p class="panel-label">Flow</p>
           <div id="step-list" class="step-list"></div>
         </div>
 
         <div class="panel spec-panel">
-          <p class="panel-label">Current spec</p>
+          <p class="panel-label">Draft</p>
           <div id="spec-grid" class="spec-grid"></div>
+        </div>
+
+        <div class="panel datanet-panel">
+          <p class="panel-label">Live Datanet</p>
+          <div id="datanet-state" class="datanet-state"></div>
+          <div class="action-grid">
+            <button id="create-datanet" class="secondary-action">Create datanet</button>
+            <button id="publish-entry" class="secondary-action">Publish input</button>
+            <button id="cast-vote" class="secondary-action">Record vote</button>
+          </div>
         </div>
       </section>
     </main>

@@ -1,47 +1,69 @@
 const voiceToggle = document.getElementById("voice-toggle");
 const voiceStatus = document.getElementById("voice-status");
+const voiceName = document.getElementById("voice-name");
+const currentQuestionEl = document.getElementById("current-question");
 const textForm = document.getElementById("text-form");
 const textInput = document.getElementById("text-input");
 const responseText = document.getElementById("response-text");
 const stepList = document.getElementById("step-list");
 const specGrid = document.getElementById("spec-grid");
+const datanetState = document.getElementById("datanet-state");
+const createDatanetButton = document.getElementById("create-datanet");
+const publishEntryButton = document.getElementById("publish-entry");
+const castVoteButton = document.getElementById("cast-vote");
+
+const datanetDefinition =
+  "A datanet is a tokenized RL environment where the task is defined by the datanet owner, the inputs come from data publishers, and the verifiers are VeReppo voters.";
 
 const initialState = {
   wakePhraseDetected: false,
-  name: "Untitled Datanet",
-  market: "No market selected yet",
-  publishingFee: "Not set",
-  emissions: "Not set",
-  rewards: "Not set",
-  datasetPlan: "Pending",
-  rlPlan: "Not needed yet",
+  knowsDatanet: null,
+  name: "",
+  market: "",
+  publishingFee: "",
+  emissions: "",
+  rewards: "70% publishers / 20% VeReppo voters / 10% reserve",
+  datasetPlan: "",
+  rlPlan: "",
+  ownerTask: "",
   response:
-    "I'm ready. Ask me to create a datanet, find datasets, or design an RL environment.",
+    "I’m ready. I’ll ask a few questions and create the datanet live.",
+  currentQuestion: "Do you already know what a datanet is?",
   steps: [
     {
-      title: "Waiting for input",
-      body: "Click the orb and speak, or type a command below.",
+      title: "Define the concept",
+      body: "Confirm whether you want a quick explanation of what a datanet is.",
       status: "active"
     },
     {
-      title: "Interpret market",
-      body: "I map your request into a datanet scope and incentive model.",
+      title: "Gather core setup",
+      body: "Capture the market, datanet name, publishing fee, and owner-defined task.",
       status: "pending"
     },
     {
-      title: "Check data supply",
-      body: "I look for existing datasets and data contribution paths.",
+      title: "Create the datanet",
+      body: "Instantiate the off-chain datanet and open it to publishers and VeReppo voters.",
       status: "pending"
     },
     {
-      title: "Decide bootstrap path",
-      body: "If supply is weak, I recommend an RL environment.",
+      title: "Drive activity",
+      body: "Publish sample inputs and register verifier votes.",
       status: "pending"
     }
-  ]
+  ],
+  datanetCreated: false,
+  publishes: 0,
+  votes: 0,
+  activity: [],
+  pendingField: "knowsDatanet"
 };
 
 const state = JSON.parse(JSON.stringify(initialState));
+
+let voices = [];
+let preferredVoice = null;
+let recognition;
+let listening = false;
 
 function renderSteps() {
   stepList.innerHTML = "";
@@ -69,13 +91,14 @@ function renderSteps() {
 
 function renderSpec() {
   const specs = [
-    ["Market", state.market],
-    ["Datanet", state.name],
-    ["Publishing fee", state.publishingFee],
-    ["Emissions", state.emissions],
-    ["Rewards", state.rewards],
-    ["Dataset plan", state.datasetPlan],
-    ["RL path", state.rlPlan]
+    ["Market", state.market || "Not defined yet"],
+    ["Datanet", state.name || "Not named yet"],
+    ["Owner task", state.ownerTask || "Not defined yet"],
+    ["Publishing fee", state.publishingFee || "Not set"],
+    ["Emissions", state.emissions || "Suggested: 500 REPP / epoch"],
+    ["VeReppo rewards", state.rewards],
+    ["Dataset plan", state.datasetPlan || "Pending after creation"],
+    ["RL path", state.rlPlan || "Standby until needed"]
   ];
 
   specGrid.innerHTML = "";
@@ -96,40 +119,122 @@ function renderSpec() {
   });
 }
 
+function renderDatanetState() {
+  datanetState.innerHTML = "";
+
+  const card = document.createElement("article");
+  card.className = "datanet-card";
+
+  const title = document.createElement("h3");
+  title.className = "datanet-title";
+  title.textContent = state.datanetCreated ? state.name : "Draft datanet";
+
+  const body = document.createElement("p");
+  body.className = "step-body";
+  body.textContent = state.datanetCreated
+    ? `${state.name} is live for publishers and VeReppo voters in this off-chain demo.`
+    : "Answer the interview questions and AI REPPO will create the datanet automatically.";
+
+  const meta = document.createElement("div");
+  meta.className = "datanet-meta";
+  meta.innerHTML = `
+    <span class="mini-pill ${state.datanetCreated ? "good" : ""}">${state.datanetCreated ? "Live" : "Interviewing"}</span>
+    <span class="mini-pill">${state.publishes} publishes</span>
+    <span class="mini-pill gold">${state.votes} votes</span>
+  `;
+
+  card.append(title, body, meta);
+  datanetState.append(card);
+
+  state.activity.slice(0, 4).forEach((item) => {
+    const feed = document.createElement("article");
+    feed.className = "feed-card";
+
+    const feedTitle = document.createElement("p");
+    feedTitle.className = "step-title";
+    feedTitle.textContent = item.title;
+
+    const feedBody = document.createElement("p");
+    feedBody.className = "step-body";
+    feedBody.textContent = item.body;
+
+    feed.append(feedTitle, feedBody);
+    datanetState.append(feed);
+  });
+
+  createDatanetButton.disabled = !isReadyToCreate() || state.datanetCreated;
+  publishEntryButton.disabled = !state.datanetCreated;
+  castVoteButton.disabled = !state.datanetCreated;
+}
+
 function setResponse(text) {
   state.response = text;
   responseText.textContent = text;
 }
 
-function updateSteps(mode) {
+function setCurrentQuestion(text) {
+  state.currentQuestion = text;
+  currentQuestionEl.textContent = text;
+}
+
+function updateSteps() {
   const steps = JSON.parse(JSON.stringify(initialState.steps));
 
-  steps[0].status = "done";
-  steps[0].body = "Request received.";
-  steps[1].status = "done";
-  steps[1].body = `Mapped market: ${state.market}.`;
-  steps[2].status = "active";
-  steps[2].body = state.datasetPlan;
-  steps[3].status = "pending";
+  if (state.knowsDatanet !== null) {
+    steps[0].status = "done";
+    steps[0].body = state.knowsDatanet
+      ? "User already knows the datanet concept."
+      : "AI REPPO explained the datanet concept.";
+    steps[1].status = "active";
+  }
 
-  if (mode === "rl") {
-    steps[2].status = "done";
-    steps[3].status = "done";
-    steps[3].body = state.rlPlan;
-  } else if (mode === "dataset") {
-    steps[2].status = "done";
+  if (state.market || state.name || state.publishingFee || state.ownerTask) {
+    steps[1].status = "active";
+    const progress = [
+      state.market ? "market" : null,
+      state.name ? "name" : null,
+      state.publishingFee ? "publish fee" : null,
+      state.ownerTask ? "task" : null
+    ].filter(Boolean);
+    steps[1].body = progress.length
+      ? `Captured: ${progress.join(", ")}.`
+      : steps[1].body;
+  }
+
+  if (isReadyToCreate()) {
+    steps[1].status = "done";
+    steps[2].status = state.datanetCreated ? "done" : "active";
+    steps[2].body = state.datanetCreated
+      ? `${state.name} is live in demo mode.`
+      : "Everything is ready. AI REPPO can create the datanet now.";
+  }
+
+  if (state.datanetCreated) {
     steps[3].status = "active";
-    steps[3].body = "Existing supply is usable. RL stays on standby.";
-  } else {
-    steps[3].status = "active";
-    steps[3].body = "Waiting to see if an RL bootstrap is needed.";
+    steps[3].body = `${state.publishes} publisher entries and ${state.votes} VeReppo votes recorded.`;
   }
 
   state.steps = steps;
 }
 
-function marketFromText(text) {
+function addActivity(title, body) {
+  state.activity.unshift({ title, body });
+}
+
+function isYes(text) {
+  return /\b(yes|yeah|yep|i do|i know|sure|correct)\b/i.test(text);
+}
+
+function isNo(text) {
+  return /\b(no|nope|not really|i don't|dont know|do not know)\b/i.test(text);
+}
+
+function extractMarket(text) {
   const lower = text.toLowerCase();
+  const direct = text.match(/(?:for|around)\s+([a-z0-9\s,&/-]+?)(?:\.|,| with| called| named| charging| and)/i);
+  if (direct) {
+    return direct[1].trim();
+  }
   if (lower.includes("charging") || lower.includes("ev")) {
     return "EV charging uptime";
   }
@@ -142,10 +247,28 @@ function marketFromText(text) {
   if (lower.includes("climate") || lower.includes("air quality")) {
     return "Climate intelligence";
   }
-  return "Custom market";
+  return "";
 }
 
-function datanetName(market) {
+function extractName(text) {
+  const match = text.match(/(?:name it|call it|called|named)\s+([a-z0-9][a-z0-9\s-]{1,40})/i);
+  return match ? match[1].trim() : "";
+}
+
+function extractPublishingFee(text) {
+  const match = text.match(/(?:publishing fee|charge(?: publishers| contributors)? to publish|cost to publish)(?: to| of)?\s+([\d.]+\s*[a-z]+)/i);
+  return match ? match[1].toUpperCase().replace(/\s+/, " ") : "";
+}
+
+function extractTask(text) {
+  const match = text.match(/(?:task is|task should be|it should|i want it to|for)\s+([a-z0-9\s,&/-]{8,100})/i);
+  return match ? match[1].trim() : "";
+}
+
+function suggestNameFromMarket(market) {
+  if (!market) {
+    return "";
+  }
   return market
     .split(/\s+/)
     .slice(0, 2)
@@ -153,82 +276,254 @@ function datanetName(market) {
     .join("") + "Net";
 }
 
-function parseFee(text) {
-  const match = text.match(/publishing fee(?: to| of)?\s+([\d.]+\s*[a-z]+)/i);
-  return match ? match[1].toUpperCase().replace(/\s+/, " ") : "Suggested: 2 USDC";
-}
-
-function parseEmissions(text) {
-  const match = text.match(/(\d[\d,]*)\s+([a-z]{2,10})\s+(?:per epoch|epoch)/i);
-  return match ? `${match[1].replace(/,/g, "")} ${match[2].toUpperCase()} / epoch` : "Suggested: 500 REPP / epoch";
-}
-
-function parseRewards(text) {
-  const contributor = text.match(/contributors?[^\d]*(\d{1,3})\s*percent/i);
-  const curator = text.match(/curators?[^\d]*(\d{1,3})\s*percent/i);
-
-  if (contributor || curator) {
-    const pieces = [];
-    if (contributor) {
-      pieces.push(`${contributor[1]}% contributors`);
-    }
-    if (curator) {
-      pieces.push(`${curator[1]}% curators`);
-    }
-    return pieces.join(" / ");
+function chooseNextQuestion() {
+  if (state.knowsDatanet === null) {
+    return "Do you already know what a datanet is?";
   }
-
-  return "Suggested: 70% contributors / 20% curators / 10% reserve";
+  if (!state.market) {
+    return "What is this datanet for?";
+  }
+  if (!state.name) {
+    return "What do you want to name the datanet?";
+  }
+  if (!state.publishingFee) {
+    return "How much do you want to charge data contributors to publish into this datanet?";
+  }
+  if (!state.ownerTask) {
+    return "What task should this datanet optimize for?";
+  }
+  if (!state.datanetCreated) {
+    return "I have enough. Should I create the datanet now?";
+  }
+  return "The datanet is live. Want me to publish a sample entry or record a VeReppo vote?";
 }
 
-function processIntent(rawText) {
+function explainDatanet() {
+  state.knowsDatanet = false;
+  setResponse(`${datanetDefinition} What is this datanet for?`);
+  setCurrentQuestion("What is this datanet for?");
+  addActivity("Concept explained", "AI REPPO explained what a datanet is and moved into setup.");
+}
+
+function maybeAutofillFromFullPrompt(text) {
+  const market = extractMarket(text);
+  const name = extractName(text);
+  const fee = extractPublishingFee(text);
+  const task = extractTask(text);
+
+  if (market && !state.market) {
+    state.market = market;
+  }
+  if (name && !state.name) {
+    state.name = name;
+  }
+  if (fee && !state.publishingFee) {
+    state.publishingFee = fee;
+  }
+  if (task && !state.ownerTask) {
+    state.ownerTask = task;
+  }
+  if (!state.name && state.market) {
+    state.name = suggestNameFromMarket(state.market);
+  }
+}
+
+function processInterview(rawText) {
   const hasWakePhrase = /hey\s+reppo/i.test(rawText);
   const text = rawText.replace(/hey\s+reppo[:,]?\s*/i, "").trim();
   const lower = text.toLowerCase();
 
   state.wakePhraseDetected = hasWakePhrase || state.wakePhraseDetected;
-  state.market = marketFromText(text);
-  state.name = datanetName(state.market);
-  state.publishingFee = parseFee(text);
-  state.emissions = parseEmissions(text);
-  state.rewards = parseRewards(text);
+  maybeAutofillFromFullPrompt(text);
 
-  let mode = "create";
-
-  if (lower.includes("dataset")) {
-    state.datasetPlan = `Searching public and partner sources for ${state.market.toLowerCase()}.`;
-    mode = "dataset";
-  } else {
-    state.datasetPlan = "Ready to search datasets once the market definition is confirmed.";
+  if (state.knowsDatanet === null) {
+    if (isNo(text) || lower.includes("what is a datanet")) {
+      explainDatanet();
+      updateSteps();
+      renderSpec();
+      renderDatanetState();
+      renderSteps();
+      return;
+    }
+    if (isYes(text)) {
+      state.knowsDatanet = true;
+      addActivity("Concept skipped", "User already knew what a datanet is.");
+      setResponse("Got it. What is this datanet for?");
+      setCurrentQuestion("What is this datanet for?");
+      updateSteps();
+      renderSpec();
+      renderDatanetState();
+      renderSteps();
+      return;
+    }
+    if (lower.includes("create") || lower.includes("datanet")) {
+      state.knowsDatanet = true;
+      addActivity("Concept assumed", "AI REPPO inferred the user wants to move straight into creation.");
+    }
   }
 
-  if (lower.includes("rl") || lower.includes("synthetic") || lower.includes("if there are gaps")) {
-    state.rlPlan = `Propose a simulated ${state.market.toLowerCase()} environment to bootstrap supply before live contributors scale up.`;
-    mode = "rl";
-  } else {
-    state.rlPlan = "Standby until data supply looks thin.";
+  if (!state.market) {
+    state.market = extractMarket(text) || text;
+    if (!state.name) {
+      state.name = suggestNameFromMarket(state.market);
+    }
+    addActivity("Market defined", `Datanet scope set to ${state.market}.`);
+    setResponse(`This datanet is for ${state.market}. What do you want to name it?`);
+    setCurrentQuestion("What do you want to name the datanet?");
+    updateSteps();
+    renderSpec();
+    renderDatanetState();
+    renderSteps();
+    return;
   }
 
-  if (mode === "rl") {
-    setResponse(
-      `I mapped ${state.market.toLowerCase()} into ${state.name}, checked for data supply, and I’d bootstrap the market with an RL environment while contributors come online.`
-    );
-  } else if (mode === "dataset") {
-    setResponse(
-      `I mapped ${state.market.toLowerCase()} into ${state.name} and I’m searching for usable datasets before proposing any synthetic bootstrap path.`
-    );
-  } else {
-    setResponse(
-      `I mapped your request into ${state.name} with a draft publishing fee, emissions plan, and reward split. Next I can search for datasets or design an RL bootstrap path.`
-    );
+  if (!state.name || state.name === suggestNameFromMarket(state.market)) {
+    const explicitName = extractName(text);
+    if (explicitName) {
+      state.name = explicitName;
+    } else if (!/what|how|yes|no/i.test(text)) {
+      state.name = text;
+    }
+    addActivity("Name chosen", `Datanet named ${state.name}.`);
+    setResponse(`${state.name} it is. How much should publishers pay to contribute data?`);
+    setCurrentQuestion("How much do you want to charge data contributors to publish into this datanet?");
+    updateSteps();
+    renderSpec();
+    renderDatanetState();
+    renderSteps();
+    return;
   }
 
-  updateSteps(mode);
+  if (!state.publishingFee) {
+    state.publishingFee = extractPublishingFee(text) || text.toUpperCase();
+    addActivity("Publishing fee set", `Publish fee set to ${state.publishingFee}.`);
+    setResponse(`Publishers will pay ${state.publishingFee}. What task should ${state.name} optimize for?`);
+    setCurrentQuestion("What task should this datanet optimize for?");
+    updateSteps();
+    renderSpec();
+    renderDatanetState();
+    renderSteps();
+    return;
+  }
+
+  if (!state.ownerTask) {
+    state.ownerTask = extractTask(text) || text;
+    state.datasetPlan = `Search for publisher inputs relevant to ${state.market.toLowerCase()}.`;
+    state.rlPlan = `If supply is thin, spin up a tokenized RL environment around the task "${state.ownerTask}".`;
+    addActivity("Task defined", `Owner task set to ${state.ownerTask}.`);
+    setResponse(
+      `I have the market, name, publish fee, and task. I’m creating ${state.name} now for publishers and VeReppo voters.`
+    );
+    setCurrentQuestion("I’m creating the datanet now.");
+    autoCreateDatanet();
+    return;
+  }
+
+  if (state.datanetCreated && /publish/i.test(lower)) {
+    publishEntry();
+    return;
+  }
+
+  if (state.datanetCreated && /vote|voter|verify/i.test(lower)) {
+    castVote();
+    return;
+  }
+
+  setResponse("I’m still here with the datanet live. Want me to publish sample data or record a VeReppo vote?");
+  setCurrentQuestion("Publish sample data or record a VeReppo vote?");
+  renderSteps();
+}
+
+function autoCreateDatanet() {
+  state.datanetCreated = true;
+  state.emissions = state.emissions || "Suggested: 500 REPP / epoch";
+  addActivity(
+    "Datanet created",
+    `${state.name} is live. Publishers can now submit inputs, and VeReppo voters can verify them.`
+  );
+  updateSteps();
   renderSpec();
+  renderDatanetState();
+  renderSteps();
+  setResponse(
+    `${state.name} is live. Publishers can contribute inputs, and VeReppo voters can verify them. Want me to publish a sample contribution next?`
+  );
+  setCurrentQuestion("Want me to publish a sample contribution?");
+  speak(state.response);
+}
+
+function createDatanet() {
+  if (!isReadyToCreate() || state.datanetCreated) {
+    return;
+  }
+  autoCreateDatanet();
+}
+
+function isReadyToCreate() {
+  return Boolean(state.market && state.name && state.publishingFee && state.ownerTask);
+}
+
+function publishEntry() {
+  if (!state.datanetCreated) {
+    return;
+  }
+
+  state.publishes += 1;
+  addActivity(
+    `Publisher input #${state.publishes}`,
+    `A publisher submitted a ${state.market.toLowerCase()} input and paid ${state.publishingFee}.`
+  );
+  updateSteps();
+  renderDatanetState();
+  renderSteps();
+  setResponse(
+    `Sample publisher input accepted. ${state.name} now has ${state.publishes} published input${state.publishes === 1 ? "" : "s"}. Want me to record a VeReppo vote too?`
+  );
+  setCurrentQuestion("Want me to record a VeReppo verifier vote too?");
+  speak(state.response);
+}
+
+function castVote() {
+  if (!state.datanetCreated) {
+    return;
+  }
+
+  state.votes += 1;
+  addActivity(
+    `VeReppo vote #${state.votes}`,
+    `A VeReppo voter verified the latest publisher input for ${state.name}.`
+  );
+  updateSteps();
+  renderDatanetState();
+  renderSteps();
+  setResponse(
+    `VeReppo vote recorded. ${state.name} now has ${state.votes} verifier vote${state.votes === 1 ? "" : "s"} shaping data quality.`
+  );
+  setCurrentQuestion("The datanet is live. Want another publish or another vote?");
+  speak(state.response);
 }
 
 function setVoiceStatus(text) {
   voiceStatus.textContent = text;
+}
+
+function choosePreferredVoice() {
+  if (!("speechSynthesis" in window)) {
+    voiceName.textContent = "Speech not supported in this browser";
+    return;
+  }
+
+  voices = window.speechSynthesis.getVoices();
+  preferredVoice =
+    voices.find((voice) => /samantha|ava|allison|serena|karen/i.test(voice.name)) ||
+    voices.find((voice) => /google us english|zira|aria|jenny/i.test(voice.name)) ||
+    voices.find((voice) => /en-us|en_us/i.test(voice.lang)) ||
+    voices[0] ||
+    null;
+
+  voiceName.textContent = preferredVoice
+    ? `Using ${preferredVoice.name}`
+    : "Using browser default voice";
 }
 
 function speak(text) {
@@ -237,14 +532,15 @@ function speak(text) {
   }
 
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1;
-  utterance.pitch = 0.96;
+  utterance.rate = 0.98;
+  utterance.pitch = 0.94;
+  utterance.volume = 1;
+  if (preferredVoice) {
+    utterance.voice = preferredVoice;
+  }
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
-
-let recognition;
-let listening = false;
 
 function setupRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -261,7 +557,7 @@ function setupRecognition() {
   recognition.onstart = () => {
     listening = true;
     document.body.classList.add("listening");
-    setVoiceStatus("Listening. Say “Hey Reppo” or just say what you want built.");
+    setVoiceStatus("Listening. Say “Hey Reppo” or just answer the current question.");
   };
 
   recognition.onresult = (event) => {
@@ -270,8 +566,7 @@ function setupRecognition() {
       .join(" ");
 
     if (event.results[event.results.length - 1].isFinal) {
-      processIntent(text);
-      speak(state.response);
+      processInterview(text);
     } else {
       setVoiceStatus(`Hearing: "${text}"`);
     }
@@ -284,7 +579,7 @@ function setupRecognition() {
   recognition.onend = () => {
     listening = false;
     document.body.classList.remove("listening");
-    setVoiceStatus("Idle. Click the orb to speak again.");
+    setVoiceStatus("Idle. Click the orb to answer the next question.");
   };
 }
 
@@ -308,10 +603,22 @@ textForm.addEventListener("submit", (event) => {
     return;
   }
 
-  processIntent(text);
+  processInterview(text);
+  speak(state.response);
   textInput.value = "";
 });
 
+createDatanetButton.addEventListener("click", createDatanet);
+publishEntryButton.addEventListener("click", publishEntry);
+castVoteButton.addEventListener("click", castVote);
+
+if ("speechSynthesis" in window) {
+  choosePreferredVoice();
+  window.speechSynthesis.onvoiceschanged = choosePreferredVoice;
+}
+
 renderSteps();
 renderSpec();
+renderDatanetState();
+setCurrentQuestion(state.currentQuestion);
 setupRecognition();

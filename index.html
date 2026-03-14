@@ -14,130 +14,65 @@
   </head>
   <body>
     <div class="ambient">
-      <div class="halo halo-a"></div>
-      <div class="halo halo-b"></div>
-      <div class="mesh"></div>
+      <div class="glow glow-left"></div>
+      <div class="glow glow-right"></div>
+      <div class="grid"></div>
     </div>
 
-    <main class="page">
-      <section class="hero card">
-        <div class="hero-copy">
-          <p class="eyebrow">AI REPPO</p>
-          <h1>Create datanets by talking.</h1>
-          <p class="lede">
-            Say “Hey Reppo” to define a datanet, search for datasets, and if the
-            market is missing data, spin up a simulated RL environment to bootstrap supply.
-          </p>
-          <div class="hero-actions">
-            <button id="voice-toggle" class="primary">Start AI REPPO</button>
-            <button id="simulate-demo" class="secondary">Investor walkthrough</button>
-          </div>
-          <p id="voice-status" class="status">
-            Voice mode is idle. In Chrome, say “Hey Reppo” followed by your request.
+    <main class="shell">
+      <header class="masthead">
+        <p class="eyebrow">AI REPPO</p>
+        <h1>Talk. It builds the datanet.</h1>
+        <p class="lede">
+          Click the orb, say what market you want, and AI REPPO will map the
+          datanet, search for data supply, and propose an RL bootstrap path when needed.
+        </p>
+      </header>
+
+      <section class="orb-room">
+        <button id="voice-toggle" class="voice-orb" aria-label="Activate AI REPPO">
+          <span class="orb-core"></span>
+          <span class="orb-ring orb-ring-a"></span>
+          <span class="orb-ring orb-ring-b"></span>
+          <span class="orb-ring orb-ring-c"></span>
+        </button>
+
+        <div class="orb-copy">
+          <p class="orb-kicker">Voice interface</p>
+          <h2>AI REPPO</h2>
+          <p id="voice-status" class="voice-status">
+            Idle. Click the orb, then say “Hey Reppo” or just start talking.
           </p>
         </div>
 
-        <div class="hero-side">
-          <div class="metric">
-            <span class="metric-label">Wake phrase</span>
-            <strong>“Hey Reppo”</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Modes</span>
-            <strong>Datanet, dataset search, RL lab</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Demo promise</span>
-            <strong>Off-chain, investor-safe, shareable</strong>
-          </div>
+        <form id="text-form" class="command-bar">
+          <input
+            id="text-input"
+            type="text"
+            autocomplete="off"
+            placeholder='Try: "Create a datanet for EV charging uptime with a 2 USDC publishing fee."'
+          />
+          <button type="submit">Run</button>
+        </form>
+      </section>
+
+      <section class="workbench">
+        <div class="panel response-panel">
+          <p class="panel-label">AI REPPO response</p>
+          <p id="response-text" class="response-text">
+            I’m ready. Ask me to create a datanet, find datasets, or design an RL environment.
+          </p>
         </div>
-      </section>
 
-      <section class="topline">
-        <div class="pill">Voice-native orchestration</div>
-        <div class="pill">Dataset retrieval and gaps analysis</div>
-        <div class="pill">RL environment fallback</div>
-        <div class="pill">Contract-ready economics, off-chain demo</div>
-      </section>
+        <div class="panel steps-panel">
+          <p class="panel-label">Showing work</p>
+          <div id="step-list" class="step-list"></div>
+        </div>
 
-      <section class="workspace">
-        <section class="card panel conversation-panel">
-          <div class="panel-heading">
-            <h2>Conversation</h2>
-            <span class="badge">Live AI REPPO session</span>
-          </div>
-
-          <div id="transcript" class="transcript"></div>
-
-          <form id="text-form" class="composer">
-            <input
-              id="text-input"
-              type="text"
-              autocomplete="off"
-              placeholder='Try: "Hey Reppo, create a datanet for EV charging uptime and find datasets for it."'
-            />
-            <button type="submit">Send</button>
-          </form>
-
-          <div class="prompt-list">
-            <button
-              class="prompt-chip"
-              data-prompt="Hey Reppo, create a datanet for EV charging uptime. Set publishing fee to 2 USDC, subnet fee to 0.2 ETH, emissions to 500 REPP per epoch, contributor rewards to 70 percent, curator rewards to 20 percent, and find datasets."
-            >
-              EV charging
-            </button>
-            <button
-              class="prompt-chip"
-              data-prompt="Hey Reppo, search for datasets for autonomous warehouse robotics. If there are gaps, set up an RL environment and draft a datanet monetization plan."
-            >
-              Robotics RL
-            </button>
-            <button
-              class="prompt-chip"
-              data-prompt="Hey Reppo, launch a sports prediction datanet with a 1 USDC publishing fee and 1000 DATA per epoch, then search for datasets."
-            >
-              Sports markets
-            </button>
-          </div>
-        </section>
-
-        <section class="side-stack">
-          <section class="card panel">
-            <div class="panel-heading">
-              <h2>Datanet Blueprint</h2>
-              <span class="badge muted">Captured from speech</span>
-            </div>
-            <dl id="blueprint" class="blueprint"></dl>
-          </section>
-
-          <section class="card panel">
-            <div class="panel-heading">
-              <h2>Dataset Search</h2>
-              <span class="badge success">Market discovery</span>
-            </div>
-            <div id="dataset-results" class="results-grid"></div>
-          </section>
-
-          <section class="card panel">
-            <div class="panel-heading">
-              <h2>RL Environment</h2>
-              <span class="badge warning">Fallback when data is scarce</span>
-            </div>
-            <div id="rl-plan" class="rl-plan"></div>
-          </section>
-
-          <section class="card panel">
-            <div class="panel-heading">
-              <h2>Execution Summary</h2>
-              <span class="badge success">Investor-ready</span>
-            </div>
-            <pre id="payload" class="payload"></pre>
-            <button id="deploy-button" class="primary wide">Simulate creation</button>
-            <p id="deploy-status" class="status">
-              Off-chain demo mode. This generates the business outcome without touching a wallet.
-            </p>
-          </section>
-        </section>
+        <div class="panel spec-panel">
+          <p class="panel-label">Current spec</p>
+          <div id="spec-grid" class="spec-grid"></div>
+        </div>
       </section>
     </main>
 

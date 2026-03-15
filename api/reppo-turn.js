@@ -13,7 +13,8 @@ Core behavior:
 Product framing:
 - Start from the user's market or dataset request.
 - You can say you scan reppo.exchange and the broader market in demo mode.
-- If the market looks open or underserved, confidently move into creating a new datanet.
+- Do not move into datanet creation unless the user explicitly asks to create, spin up, or launch a datanet.
+- If the market looks open or underserved before the user asks to create, explain what you found and ask whether they want to create a datanet.
 - A datanet is a tokenized RL environment where the owner defines the task and data publishers provide inputs.
 - If asked about publishing or voting, say those capabilities are coming soon.
 - If asked about agents, say an agent-specific flow is coming soon.
@@ -22,8 +23,8 @@ Product framing:
 Desired flow:
 1. Understand the market or dataset opportunity.
 2. Briefly say what you found.
-3. Move to a clean step-by-step launch flow.
-4. Ask for:
+3. Only if the user explicitly asks to create a datanet, move to a clean step-by-step launch flow.
+4. Then ask for:
    - approval of the 20k REPPO spin-up fee
    - publishing fee amount and token
    - emissions seed amount and token
@@ -34,6 +35,7 @@ Desired flow:
    - "Approved. Now set the publishing fee."
    - "Good. Now seed emissions."
    - "Locked. Your datanet is packaged."
+8. If the user says "approved" during launch mode, treat that as approving the demo spin-up fee and move to the next configuration step.
 
 Return strictly valid JSON matching the schema.
 `;
@@ -41,6 +43,7 @@ Return strictly valid JSON matching the schema.
 const STAGE_ORDER = [
   "idle",
   "search_result",
+  "launch_intro",
   "approve_spinup",
   "publishing_fee",
   "emissions",
@@ -51,8 +54,10 @@ const STAGE_ORDER = [
 function normalizeState(current = {}, patch = {}) {
   const next = {
     stage: current.stage || "idle",
+    mode: current.mode || "chat",
     market: current.market || "",
     datasetSummary: current.datasetSummary || "",
+    reasoning: current.reasoning || "",
     name: current.name || "",
     spinupFee: current.spinupFee || "20k REPPO",
     publishingFeeAmount: current.publishingFeeAmount || "",
@@ -85,6 +90,9 @@ function computeStage(state) {
   if (state.transactionStatus === "ready") {
     return "success";
   }
+  if (state.mode !== "launch") {
+    return state.market || state.datasetSummary ? "search_result" : "idle";
+  }
   if (state.publishingFeeAmount && state.publishingFeeToken && state.emissionsAmount && state.emissionsToken) {
     return "review";
   }
@@ -93,6 +101,9 @@ function computeStage(state) {
   }
   if (state.transactionStatus === "approved") {
     return "publishing_fee";
+  }
+  if (state.mode === "launch") {
+    return "launch_intro";
   }
   if (state.datasetSummary) {
     return "approve_spinup";
@@ -106,7 +117,9 @@ function computeStage(state) {
 function buildQuestion(state) {
   switch (state.stage) {
     case "search_result":
-      return "This looks open. Want me to spin up a new datanet?";
+      return "Want me to create a datanet from this market?";
+    case "launch_intro":
+      return `First step: approve ${state.spinupFee}.`;
     case "approve_spinup":
       return `Please approve ${state.spinupFee}.`;
     case "publishing_fee":
@@ -125,7 +138,9 @@ function buildQuestion(state) {
 function buildMeta(state) {
   switch (state.stage) {
     case "search_result":
-      return ["Opportunity found", "Entering launch mode"];
+      return ["Result ready", "Create datanet if you want"];
+    case "launch_intro":
+      return [state.market || "Market set", "Creating datanet"];
     case "approve_spinup":
       return [state.market || "Market set", state.spinupFee];
     case "publishing_fee":
@@ -175,6 +190,8 @@ module.exports = async function handler(req, res) {
             properties: {
               market: { type: "string" },
               datasetSummary: { type: "string" },
+              reasoning: { type: "string" },
+              mode: { type: "string" },
               name: { type: "string" },
               spinupFee: { type: "string" },
               publishingFeeAmount: { type: "string" },
@@ -186,6 +203,8 @@ module.exports = async function handler(req, res) {
             required: [
               "market",
               "datasetSummary",
+              "reasoning",
+              "mode",
               "name",
               "spinupFee",
               "publishingFeeAmount",

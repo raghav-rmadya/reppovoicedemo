@@ -1,38 +1,43 @@
-# AI REPPO Demo
+# AI REPPO
 
-Off-chain investor demo for a voice-first datanet creation experience.
+Voice-first datanet creation demo backed by OpenAI.
 
-## What this does
+## What changed
 
-- Uses a wake phrase: `Hey Reppo`
-- Creates datanet economics from voice or typed prompts
-- Simulates dataset discovery for the requested market
-- Falls back to an RL environment proposal when live data is missing or fragmented
-- Produces an off-chain execution summary suitable for investor presentations
+- Frontend talks to Vercel serverless functions
+- OpenAI handles the conversational interview
+- OpenAI speech generates spoken replies
+- Datanet creation, publish input, and VeReppo vote actions are executed as off-chain demo state changes
 
-## Local preview
+## Files to deploy
+
+Upload these frontend files to the repo root:
+
+- `index.html`
+- `styles.css`
+- `script.js`
+- `README.md`
+- `vercel.json`
+
+Upload this folder to the repo root too:
+
+- `api/`
+
+## Required environment variable
+
+In Vercel, add:
 
 ```bash
-cd /Users/raghavrmadya/Documents/Playground/demo
-python3 -m http.server 4173
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-Then open `http://localhost:4173` in Chrome.
+## Endpoints
 
-## Fast Vercel deployment
+- `api/reppo-turn.js`: conversational turn handler
+- `api/reppo-speech.js`: text-to-speech proxy
 
-This is a static site, so Vercel deployment is simple:
+## Notes
 
-1. Put the contents of this `demo` folder in a GitHub repo.
-2. Import that repo into Vercel.
-3. Accept the default static deployment settings.
-4. Add your custom domain or subdomain in Vercel.
-5. Point the DNS record from GoDaddy to Vercel.
-
-## Recommended pitch flow
-
-1. Click `Investor walkthrough` to establish the core story.
-2. Run a live prompt with `Hey Reppo`.
-3. Show the dataset search panel.
-4. Show the RL environment fallback as the “market bootstrap” wedge.
-5. Finish on `Simulate creation`.
+- Voice input still uses the browser microphone API for capture
+- Spoken output comes from OpenAI first, with browser speech as fallback
+- If the site replies with an API key error, add `OPENAI_API_KEY` in Vercel and redeploy

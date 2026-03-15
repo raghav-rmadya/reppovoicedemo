@@ -23,6 +23,9 @@ const initialState = {
   publishingFeeToken: "",
   emissionsAmount: "",
   emissionsToken: "",
+  emissionsPerEpoch: "",
+  contributionShareEnabled: "",
+  contributionShareRate: "",
   transactionStatus: "",
   currentQuestion: "What market or dataset opportunity do you want to work on?",
 };
@@ -67,18 +70,28 @@ const stageContent = {
   },
   emissions: {
     label: "Step 3",
-    title: "Seed emissions.",
-    body: "How much emissions do you want to seed, and in which token?",
+    title: "Set emissions per epoch.",
+    body: "How much emissions do you want to allocate per epoch, and in which token?",
+  },
+  contribution_share: {
+    label: "Step 4",
+    title: "Enable emissions contribution?",
+    body: "Do you want outside contributors to add emissions in exchange for a fee share?",
   },
   review: {
     label: "Ready",
     title: "Your launch config is ready.",
-    body: "Say create when you want me to package the datanet.",
+    body: "Say deploy datanet when you want me to launch it.",
+  },
+  deploy_pending: {
+    label: "Deploying",
+    title: "Deploying datanet",
+    body: "Allocating the datanet shell and opening it for the market.",
   },
   success: {
-    label: "Launch Ready",
-    title: "Your datanet is packaged.",
-    body: "Launch package locked. Onchain handoff is next.",
+    label: "Deployed",
+    title: "Your datanet is live.",
+    body: "Ready for publishers and VeReppo voters to participate.",
   },
 };
 
@@ -88,6 +101,7 @@ function setVoiceStatus(text) {
 
 function setStage(stage) {
   document.body.classList.toggle("processing", stage === "searching");
+  document.body.classList.toggle("deploy-mode", stage === "deploy_pending");
   document.body.classList.toggle("success-mode", stage === "success");
   const content = stageContent[stage] || stageContent.idle;
   screenLabel.textContent = content.label;
@@ -122,10 +136,18 @@ function renderSummary() {
       `${state.publishingFeeAmount || "?"} ${state.publishingFeeToken || ""}`.trim(),
     ]);
   }
-  if (state.emissionsAmount || state.emissionsToken) {
+  if (state.emissionsPerEpoch || state.emissionsAmount || state.emissionsToken) {
     pills.push([
-      "Seed",
-      `${state.emissionsAmount || "?"} ${state.emissionsToken || ""}`.trim(),
+      "Per epoch",
+      `${state.emissionsPerEpoch || state.emissionsAmount || "?"} ${state.emissionsToken || ""}`.trim(),
+    ]);
+  }
+  if (state.contributionShareEnabled) {
+    pills.push([
+      "Fee share",
+      state.contributionShareEnabled === "enabled"
+        ? `${state.contributionShareRate || "Enabled"}`
+        : "Disabled",
     ]);
   }
 
@@ -145,7 +167,7 @@ function renderSummary() {
 }
 
 function renderReasoning() {
-  if (!state.reasoning || state.mode !== "launch") {
+  if (!state.reasoning || (state.mode !== "launch" && state.stage !== "success")) {
     reasoningBlock.classList.add("hidden");
     reasoningText.textContent = "";
     return;
@@ -182,9 +204,11 @@ function renderProcessingState() {
     launch_intro: ["Creating datanet", "Opening config"],
     approve_spinup: ["Recording approval", "Opening fee config"],
     publishing_fee: ["Setting publish fee", "Opening emissions"],
-    emissions: ["Packaging datanet", "Preparing handoff"],
-    review: ["Packaging datanet", "Preparing handoff"],
-    success: ["Packaging datanet", "Preparing handoff"],
+    emissions: ["Setting emissions", "Opening fee share"],
+    contribution_share: ["Setting fee share", "Preparing deploy"],
+    review: ["Packaging datanet", "Preparing deploy"],
+    deploy_pending: ["Deploying datanet", "Opening market"],
+    success: ["Datanet deployed", "Market open"],
   };
 
   const [title, chip] = statusMap[state.stage] || statusMap.idle;
@@ -217,6 +241,19 @@ function getProcessingState(userText) {
       title: "Approval recorded",
       body: "Moving to the next config step.",
       meta: ["Approval recorded", "Opening fee config"],
+    };
+  }
+
+  if (
+    normalized.includes("deploy datanet") ||
+    normalized === "deploy" ||
+    normalized.includes("deploy this")
+  ) {
+    return {
+      label: "Working",
+      title: "Deploying datanet",
+      body: "Allocating the datanet shell now.",
+      meta: ["Deploying datanet", "Opening market"],
     };
   }
 
@@ -272,7 +309,7 @@ async function speak(text) {
 
 async function sendTurn(userText) {
   conversation.push({ role: "user", content: userText });
-  setVoiceStatus("Working.");
+  setVoiceStatus("Thinking.");
   document.body.classList.add("processing");
   const customProcessing = getProcessingState(userText);
   if (customProcessing) {

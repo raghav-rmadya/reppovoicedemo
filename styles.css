@@ -225,6 +225,20 @@ body.processing .orb-core {
     inset 0 0 28px rgba(255, 255, 255, 0.12);
 }
 
+body.deploy-mode .orb-core {
+  animation: thinking 1s linear infinite;
+  box-shadow:
+    0 0 140px rgba(211, 29, 47, 0.42),
+    0 0 90px rgba(130, 174, 252, 0.16),
+    inset 0 0 30px rgba(255, 255, 255, 0.12);
+}
+
+body.deploy-mode .orb-ring-a,
+body.deploy-mode .orb-ring-b,
+body.deploy-mode .orb-ring-c {
+  animation: pulse 1s ease-out infinite;
+}
+
 .stage-copy {
   text-align: center;
   margin-top: -12px;
@@ -383,6 +397,13 @@ body.success-mode .screen-card {
   background:
     radial-gradient(circle at 50% 0%, rgba(211, 29, 47, 0.08), transparent 36%),
     linear-gradient(180deg, rgba(21, 21, 21, 0.96), rgba(12, 12, 12, 0.99));
+}
+
+body.success-mode .orb-core {
+  box-shadow:
+    0 0 120px rgba(211, 29, 47, 0.44),
+    0 0 60px rgba(125, 255, 185, 0.12),
+    inset 0 0 28px rgba(255, 255, 255, 0.12);
 }
 
 @keyframes pulse {

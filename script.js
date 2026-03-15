@@ -8,11 +8,15 @@ const screenBody = document.getElementById("screen-body");
 const screenMeta = document.getElementById("screen-meta");
 const screenSummary = document.getElementById("screen-summary");
 const screenCard = document.getElementById("screen-card");
+const reasoningBlock = document.getElementById("reasoning-block");
+const reasoningText = document.getElementById("reasoning-text");
 
 const initialState = {
   stage: "idle",
+  mode: "chat",
   market: "",
   datasetSummary: "",
+  reasoning: "",
   name: "",
   spinupFee: "20k REPPO",
   publishingFeeAmount: "",
@@ -34,7 +38,7 @@ const stageContent = {
     label: "Ready",
     title: "What do you want to work on?",
     body:
-      "Say a market or ask me to look for a dataset opportunity. If the market looks open, I’ll spin up a new datanet flow.",
+      "Say a market, search for a dataset, or ask me to create a datanet.",
   },
   searching: {
     label: "Scanning",
@@ -42,9 +46,14 @@ const stageContent = {
     body: "Mapping the opportunity now.",
   },
   search_result: {
-    label: "Opportunity",
-    title: "This looks like a market worth launching.",
-    body: "I don’t see a clean existing fit. I’m moving into launch mode.",
+    label: "Result",
+    title: "Here’s what I found.",
+    body: "I checked the market and I’m ready for the next step.",
+  },
+  launch_intro: {
+    label: "Launch",
+    title: "Creating a datanet.",
+    body: "I’ve switched into launch mode. I’ll walk through the config step by step.",
   },
   approve_spinup: {
     label: "Step 1",
@@ -135,6 +144,17 @@ function renderSummary() {
     .join("");
 }
 
+function renderReasoning() {
+  if (!state.reasoning || state.mode !== "launch") {
+    reasoningBlock.classList.add("hidden");
+    reasoningText.textContent = "";
+    return;
+  }
+
+  reasoningBlock.classList.remove("hidden");
+  reasoningText.textContent = state.reasoning;
+}
+
 function renderMeta(meta = []) {
   const defaults =
     state.stage === "idle"
@@ -152,12 +172,14 @@ function renderTurn(response) {
   setStage(state.stage);
   screenBody.textContent = response || stageContent[state.stage]?.body || stageContent.idle.body;
   renderSummary();
+  renderReasoning();
 }
 
 function renderProcessingState() {
   const statusMap = {
     idle: ["Scanning market", "Preparing launch"],
     search_result: ["Preparing launch", "Opening config"],
+    launch_intro: ["Creating datanet", "Opening config"],
     approve_spinup: ["Recording approval", "Opening fee config"],
     publishing_fee: ["Setting publish fee", "Opening emissions"],
     emissions: ["Packaging datanet", "Preparing handoff"],
@@ -170,6 +192,35 @@ function renderProcessingState() {
   screenTitle.textContent = title;
   screenBody.textContent = "One moment.";
   renderMeta([title, chip]);
+  renderReasoning();
+}
+
+function getProcessingState(userText) {
+  const normalized = String(userText || "").toLowerCase();
+
+  if (
+    normalized.includes("create a datanet") ||
+    normalized.includes("spin up") ||
+    normalized.includes("launch a datanet")
+  ) {
+    return {
+      label: "Working",
+      title: "Spinning up datanet",
+      body: "Packaging the launch flow now.",
+      meta: ["Spinning up datanet", "Preparing approval"],
+    };
+  }
+
+  if (normalized.includes("approved") || normalized.includes("approve")) {
+    return {
+      label: "Working",
+      title: "Approval recorded",
+      body: "Moving to the next config step.",
+      meta: ["Approval recorded", "Opening fee config"],
+    };
+  }
+
+  return null;
 }
 
 function stopCurrentAudio() {
@@ -222,8 +273,18 @@ async function speak(text) {
 async function sendTurn(userText) {
   conversation.push({ role: "user", content: userText });
   setVoiceStatus("Working.");
-  setStage("searching");
-  renderProcessingState();
+  document.body.classList.add("processing");
+  const customProcessing = getProcessingState(userText);
+  if (customProcessing) {
+    screenLabel.textContent = customProcessing.label;
+    screenTitle.textContent = customProcessing.title;
+    screenBody.textContent = customProcessing.body;
+    renderMeta(customProcessing.meta);
+    renderReasoning();
+  } else {
+    setStage("searching");
+    renderProcessingState();
+  }
   renderSummary();
 
   const response = await fetch("/api/reppo-turn", {
@@ -240,6 +301,7 @@ async function sendTurn(userText) {
 
   if (!response.ok) {
     const message = data?.message || data?.details || data?.error || "Something went wrong.";
+    document.body.classList.remove("processing");
     setStage(state.stage || "idle");
     renderMeta(["Request failed"]);
     screenBody.textContent = message;
@@ -250,6 +312,7 @@ async function sendTurn(userText) {
   state = data.state;
   conversation.push({ role: "assistant", content: data.assistantMessage });
   setVoiceStatus("Ready.");
+  document.body.classList.remove("processing");
   setStage(state.stage);
   flashStage();
   renderMeta(data.meta || []);

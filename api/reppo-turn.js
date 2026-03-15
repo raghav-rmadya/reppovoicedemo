@@ -1,25 +1,31 @@
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 const SYSTEM_PROMPT = `
-You are AI REPPO, a concise voice-first operator for creating datanets.
+You are AI REPPO, a concise voice-first operator for the Reppo ecosystem.
 
-Core definition:
-"A datanet is a tokenized RL environment where the task is defined by the datanet owner, the inputs come from data publishers, and the verifiers are VeReppo voters."
+Core positioning:
+- Lead with discovery first.
+- Start by asking whether the user wants to search for an existing dataset or opportunity in the Reppo ecosystem.
+- You can describe this as looking across reppo.exchange and broader web sources in demo mode.
+- If you find a weak or missing market, enthusiastically offer to spin up a new datanet.
+- A datanet is a tokenized RL environment where the task is defined by the datanet owner, the inputs come from data publishers, and the verifiers are VeReppo voters.
+- If asked about publishing or voting, say those abilities are coming soon, and right now you are best at helping spin up new onchain data businesses.
 
-Your job:
-- Hold a natural spoken conversation.
-- Answer side questions naturally, including "what's your name?".
-- Resume the datanet interview after side questions.
-- Collect these fields when creating a datanet:
-  1. whether the user already knows what a datanet is
-  2. what the datanet is for (market)
-  3. what they want to name it
-  4. how much publishers should pay to publish into it
-  5. what task the datanet owner wants the datanet to optimize for
-- Do not mistake side questions for datanet values.
-- Keep replies short, direct, and natural for spoken playback.
-- Once the required fields are present, you may suggest creation or create it if the user clearly wants it.
-- After creation, you may create sample events like publisher submissions or VeReppo votes.
+Your conversational style:
+- natural, sharp, enthusiastic, not robotic
+- short answers for spoken playback
+- answer side questions naturally, including "what's your name?"
+- never dump jargon unless asked
+
+Your tasks:
+- help the user search for an existing opportunity
+- summarize whether the opportunity seems served or underserved
+- if underserved, gather:
+  1. market
+  2. datanet name
+  3. publishing fee
+  4. owner-defined task
+- once these are known, prepare a launch-ready datanet
 
 Return strictly valid JSON matching the schema.
 `;
@@ -35,37 +41,35 @@ function mergeState(current, patch = {}) {
 function buildSteps(state) {
   const steps = [
     {
-      title: "Define the concept",
-      body: "Confirm whether the user wants a quick definition of what a datanet is.",
+      title: "Scan the market",
+      body: "Check Reppo and broader web sources for an existing dataset or business opportunity.",
       status: "active",
     },
     {
-      title: "Gather core setup",
-      body: "Capture the market, datanet name, publishing fee, and owner-defined task.",
+      title: "Decide the path",
+      body: "If supply is weak, offer to launch a new datanet.",
       status: "pending",
     },
     {
-      title: "Create the datanet",
-      body: "Instantiate the off-chain datanet and open it to publishers and VeReppo voters.",
+      title: "Shape the business",
+      body: "Capture the task, name, publish fee, and launch plan.",
       status: "pending",
     },
     {
-      title: "Drive activity",
-      body: "Publish sample inputs and register verifier votes.",
+      title: "Prepare launch",
+      body: "Set up the off-chain datanet demo and the onchain business story.",
       status: "pending",
     },
   ];
 
-  if (state.knowsDatanet !== null) {
+  if (state.searchSummary) {
     steps[0].status = "done";
-    steps[0].body = state.knowsDatanet
-      ? "User already knows the datanet concept."
-      : "AI REPPO explained the datanet concept.";
     steps[1].status = "active";
+    steps[1].body = state.searchSummary;
   }
 
   if (state.market || state.name || state.publishingFee || state.ownerTask) {
-    steps[1].status = "active";
+    steps[2].status = "active";
     const captured = [
       state.market ? "market" : null,
       state.name ? "name" : null,
@@ -73,21 +77,16 @@ function buildSteps(state) {
       state.ownerTask ? "task" : null,
     ].filter(Boolean);
     if (captured.length) {
-      steps[1].body = `Captured: ${captured.join(", ")}.`;
+      steps[2].body = `Captured: ${captured.join(", ")}.`;
     }
   }
 
   if (state.market && state.name && state.publishingFee && state.ownerTask) {
-    steps[1].status = "done";
-    steps[2].status = state.datanetCreated ? "done" : "active";
-    steps[2].body = state.datanetCreated
-      ? `${state.name} is live in demo mode.`
-      : "Everything is ready. AI REPPO can create the datanet now.";
-  }
-
-  if (state.datanetCreated) {
+    steps[2].status = "done";
     steps[3].status = "active";
-    steps[3].body = `${state.publishes || 0} publisher entries and ${state.votes || 0} VeReppo votes recorded.`;
+    steps[3].body = state.datanetCreated
+      ? `${state.name} is prepared as a launch-ready onchain data business.`
+      : "Everything is ready. AI REPPO can spin up the new data business now.";
   }
 
   return steps;
@@ -97,14 +96,17 @@ function buildNextQuestion(state, fallback) {
   if (fallback) {
     return fallback;
   }
-  if (state.knowsDatanet === null) {
-    return "Do you already know what a datanet is?";
+  if (!state.searchIntent) {
+    return "Want me to look for an existing dataset opportunity first?";
+  }
+  if (!state.searchSummary) {
+    return "What market should I scan?";
   }
   if (!state.market) {
-    return "What is this datanet for?";
+    return "What market should this new datanet serve?";
   }
   if (!state.name) {
-    return "What do you want to name the datanet?";
+    return "What do you want to name it?";
   }
   if (!state.publishingFee) {
     return "How much should publishers pay to contribute data?";
@@ -112,47 +114,34 @@ function buildNextQuestion(state, fallback) {
   if (!state.ownerTask) {
     return "What task should this datanet optimize for?";
   }
-  if (!state.datanetCreated) {
-    return "Should I create the datanet now?";
-  }
-  return "Do you want a sample publish or a VeReppo vote?";
+  return "I have enough. Want me to prepare the new data business?";
 }
 
 function executeActions(state, actions = []) {
   const next = mergeState(state);
 
   for (const action of actions) {
-    if (!action || !action.type) {
+    if (!action || !action.type || action.type === "none") {
       continue;
+    }
+
+    if (action.type === "search_sources") {
+      next.searchIntent = next.searchIntent || "Discovery first";
+      next.searchSources = ["reppo.exchange", "broader web"];
+      next.searchSummary =
+        action.summary ||
+        `In demo mode, AI REPPO scanned reppo.exchange and broader web sources for ${String(next.market || "the requested market").toLowerCase()}.`;
+      next.activity.unshift({
+        title: "Opportunity scan",
+        body: next.searchSummary,
+      });
     }
 
     if (action.type === "create_datanet" && !next.datanetCreated) {
       next.datanetCreated = true;
-      next.emissions = next.emissions || "Suggested: 500 REPP / epoch";
-      next.datasetPlan =
-        next.datasetPlan || `Search for publisher inputs relevant to ${String(next.market || "the market").toLowerCase()}.`;
-      next.rlPlan =
-        next.rlPlan ||
-        `If supply is thin, spin up a tokenized RL environment around the task "${next.ownerTask || "owner-defined task"}".`;
       next.activity.unshift({
-        title: "Datanet created",
-        body: `${next.name} is live. Publishers can contribute inputs, and VeReppo voters can verify them.`,
-      });
-    }
-
-    if (action.type === "publish_input" && next.datanetCreated) {
-      next.publishes = (next.publishes || 0) + 1;
-      next.activity.unshift({
-        title: `Publisher input #${next.publishes}`,
-        body: `A publisher submitted a ${String(next.market || "market").toLowerCase()} input and paid ${next.publishingFee || "the publish fee"}.`,
-      });
-    }
-
-    if (action.type === "record_vote" && next.datanetCreated) {
-      next.votes = (next.votes || 0) + 1;
-      next.activity.unshift({
-        title: `VeReppo vote #${next.votes}`,
-        body: `A VeReppo voter verified the latest publisher input for ${next.name}.`,
+        title: "Launch plan prepared",
+        body: `${next.name} is positioned as the next onchain data business to spin up.`,
       });
     }
   }
@@ -186,7 +175,7 @@ module.exports = async function handler(req, res) {
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "system",
-        content: `Current datanet state:\n${JSON.stringify(currentState, null, 2)}`,
+        content: `Current state:\n${JSON.stringify(currentState, null, 2)}`,
       },
       ...conversation.map((message) => ({
         role: message.role === "assistant" ? "assistant" : "user",
@@ -211,7 +200,8 @@ module.exports = async function handler(req, res) {
             type: "object",
             additionalProperties: false,
             properties: {
-              knowsDatanet: { type: ["boolean", "null"] },
+              searchIntent: { type: "string" },
+              searchSummary: { type: "string" },
               market: { type: "string" },
               name: { type: "string" },
               publishingFee: { type: "string" },
@@ -222,7 +212,8 @@ module.exports = async function handler(req, res) {
               rlPlan: { type: "string" }
             },
             required: [
-              "knowsDatanet",
+              "searchIntent",
+              "searchSummary",
               "market",
               "name",
               "publishingFee",
@@ -241,10 +232,11 @@ module.exports = async function handler(req, res) {
               properties: {
                 type: {
                   type: "string",
-                  enum: ["none", "create_datanet", "publish_input", "record_vote"]
-                }
+                  enum: ["none", "search_sources", "create_datanet"]
+                },
+                summary: { type: "string" }
               },
-              required: ["type"]
+              required: ["type", "summary"]
             }
           }
         },

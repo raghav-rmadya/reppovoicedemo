@@ -22,9 +22,9 @@
     <main class="shell">
       <header class="masthead">
         <p class="eyebrow">AI REPPO</p>
-        <h1>Create a datanet in real time.</h1>
+        <h1>Interact with the Reppo ecosystem using your voice.</h1>
         <p class="lede">
-          AI REPPO interviews you, defines the task, sets the publish fee, and opens the datanet for publishers and VeReppo voters.
+          AI REPPO helps you discover existing data businesses, search for dataset opportunities, and spin up new onchain data businesses when the market needs one.
         </p>
       </header>
 
@@ -45,7 +45,7 @@
           <div class="prompt-hint">
             <span class="prompt-hint-label">Current question</span>
             <p id="current-question" class="current-question">
-              Do you already know what a datanet is?
+              Want me to look for an existing dataset opportunity first?
             </p>
           </div>
         </div>
@@ -55,17 +55,20 @@
             id="text-input"
             type="text"
             autocomplete="off"
-            placeholder='Try: "No, what is a datanet?" or "Create a datanet for EV charging uptime."'
+            placeholder='Try: "Search EV charging datasets" or "Spin up a new datanet for robotics."'
           />
           <button type="submit">Send</button>
         </form>
       </section>
 
-      <section class="workbench">
+      <section id="workbench" class="workbench hidden">
         <div class="panel response-panel">
           <p class="panel-label">Response</p>
           <p id="response-text" class="response-text">
-            I’m ready. Ask me to create a datanet, find datasets, or design an RL environment.
+            I’m ready to help you discover or launch a new data business.
+          </p>
+          <p class="product-note">
+            Publishing and voting are coming soon. Right now AI REPPO is best at helping spin up new onchain data businesses.
           </p>
           <div class="voice-row">
             <span class="voice-chip">Voice</span>
@@ -74,12 +77,12 @@
         </div>
 
         <div class="panel steps-panel">
-          <p class="panel-label">Flow</p>
+          <p class="panel-label">Opportunity Map</p>
           <div id="step-list" class="step-list"></div>
         </div>
 
         <div class="panel spec-panel">
-          <p class="panel-label">Draft</p>
+          <p class="panel-label">Launch Spec</p>
           <div id="spec-grid" class="spec-grid"></div>
         </div>
 

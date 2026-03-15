@@ -11,9 +11,12 @@ const datanetState = document.getElementById("datanet-state");
 const createDatanetButton = document.getElementById("create-datanet");
 const publishEntryButton = document.getElementById("publish-entry");
 const castVoteButton = document.getElementById("cast-vote");
+const workbench = document.getElementById("workbench");
 
 const initialState = {
-  knowsDatanet: null,
+  searchIntent: "",
+  searchSummary: "",
+  searchSources: [],
   market: "",
   name: "",
   publishingFee: "",
@@ -26,26 +29,26 @@ const initialState = {
   publishes: 0,
   votes: 0,
   activity: [],
-  currentQuestion: "Do you already know what a datanet is?",
+  currentQuestion: "Want me to look for an existing dataset opportunity first?",
   steps: [
     {
-      title: "Define the concept",
-      body: "Confirm whether the user wants a quick definition of what a datanet is.",
+      title: "Scan the market",
+      body: "Check Reppo and broader web sources for an existing dataset or business opportunity.",
       status: "active",
     },
     {
-      title: "Gather core setup",
-      body: "Capture the market, datanet name, publishing fee, and owner-defined task.",
+      title: "Decide the path",
+      body: "If supply is weak, offer to launch a new datanet.",
       status: "pending",
     },
     {
-      title: "Create the datanet",
-      body: "Instantiate the off-chain datanet and open it to publishers and VeReppo voters.",
+      title: "Shape the business",
+      body: "Capture the task, name, publish fee, and launch plan.",
       status: "pending",
     },
     {
-      title: "Drive activity",
-      body: "Publish sample inputs and register verifier votes.",
+      title: "Prepare launch",
+      body: "Set up the off-chain datanet demo and the onchain business story.",
       status: "pending",
     },
   ],
@@ -55,6 +58,10 @@ let state = JSON.parse(JSON.stringify(initialState));
 let conversation = [];
 let recognition;
 let listening = false;
+
+function showWorkbench() {
+  workbench.classList.remove("hidden");
+}
 
 function renderSteps() {
   stepList.innerHTML = "";
@@ -82,14 +89,14 @@ function renderSteps() {
 
 function renderSpec() {
   const specs = [
+    ["Search intent", state.searchIntent || "Not set"],
     ["Market", state.market || "Not defined yet"],
     ["Datanet", state.name || "Not named yet"],
     ["Owner task", state.ownerTask || "Not defined yet"],
     ["Publishing fee", state.publishingFee || "Not set"],
-    ["Emissions", state.emissions || "Suggested: 500 REPP / epoch"],
-    ["VeReppo rewards", state.rewards || "Not set"],
-    ["Dataset plan", state.datasetPlan || "Pending after creation"],
-    ["RL path", state.rlPlan || "Standby until needed"],
+    ["Dataset scan", state.searchSummary || "No scan yet"],
+    ["Launch note", "Publishing and voting are coming soon"],
+    ["Best use today", "Spin up new onchain data businesses"],
   ];
 
   specGrid.innerHTML = "";
@@ -118,20 +125,20 @@ function renderDatanetState() {
 
   const title = document.createElement("h3");
   title.className = "datanet-title";
-  title.textContent = state.datanetCreated ? state.name : "Draft datanet";
+  title.textContent = state.datanetCreated ? state.name : "Opportunity status";
 
   const body = document.createElement("p");
   body.className = "step-body";
   body.textContent = state.datanetCreated
-    ? `${state.name} is live for publishers and VeReppo voters in this off-chain demo.`
-    : "AI REPPO will create the datanet once the core fields are collected.";
+    ? `${state.name} is prepared as the next onchain data business to spin up.`
+    : state.searchSummary || "AI REPPO is ready to scan Reppo and broader web sources for a data opportunity.";
 
   const meta = document.createElement("div");
   meta.className = "datanet-meta";
   meta.innerHTML = `
-    <span class="mini-pill ${state.datanetCreated ? "good" : ""}">${state.datanetCreated ? "Live" : "Interviewing"}</span>
-    <span class="mini-pill">${state.publishes || 0} publishes</span>
-    <span class="mini-pill gold">${state.votes || 0} votes</span>
+    <span class="mini-pill ${state.datanetCreated ? "good" : ""}">${state.datanetCreated ? "Launch ready" : "Discovery"}</span>
+    <span class="mini-pill">${state.searchSources?.join(" / ") || "reppo.exchange / web"}</span>
+    <span class="mini-pill gold">Publishing + voting soon</span>
   `;
 
   card.append(title, body, meta);
@@ -155,8 +162,8 @@ function renderDatanetState() {
 
   createDatanetButton.disabled =
     !state.market || !state.name || !state.publishingFee || !state.ownerTask || state.datanetCreated;
-  publishEntryButton.disabled = !state.datanetCreated;
-  castVoteButton.disabled = !state.datanetCreated;
+  publishEntryButton.disabled = true;
+  castVoteButton.disabled = true;
 }
 
 function renderResponse(text) {
@@ -168,6 +175,7 @@ function renderQuestion() {
 }
 
 function renderAll(response) {
+  showWorkbench();
   renderResponse(response);
   renderQuestion();
   renderSteps();
@@ -199,8 +207,8 @@ async function speak(text) {
   } catch (_error) {
     if ("speechSynthesis" in window) {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.98;
-      utterance.pitch = 0.94;
+      utterance.rate = 1.02;
+      utterance.pitch = 0.96;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
     }
@@ -208,6 +216,7 @@ async function speak(text) {
 }
 
 async function sendTurn(userText) {
+  showWorkbench();
   conversation.push({ role: "user", content: userText });
 
   const response = await fetch("/api/reppo-turn", {
@@ -232,7 +241,7 @@ async function sendTurn(userText) {
   state = data.state;
   conversation.push({ role: "assistant", content: data.assistantMessage });
   renderAll(data.assistantMessage);
-  await speak(data.assistantMessage);
+  speak(data.assistantMessage);
 }
 
 function setupRecognition() {
@@ -272,7 +281,7 @@ function setupRecognition() {
   recognition.onend = () => {
     listening = false;
     document.body.classList.remove("listening");
-    setVoiceStatus("Idle. Click the orb to answer the next question.");
+    setVoiceStatus("Idle. Click the orb to continue.");
   };
 }
 
@@ -301,17 +310,18 @@ textForm.addEventListener("submit", async (event) => {
 });
 
 createDatanetButton.addEventListener("click", async () => {
-  await sendTurn("Create the datanet now.");
+  await sendTurn("Create the new datanet now.");
 });
 
 publishEntryButton.addEventListener("click", async () => {
-  await sendTurn("Publish a sample contribution.");
+  await sendTurn("Tell me when publishing is available.");
 });
 
 castVoteButton.addEventListener("click", async () => {
-  await sendTurn("Record a VeReppo vote.");
+  await sendTurn("Tell me when voting is available.");
 });
 
 voiceName.textContent = "OpenAI TTS with browser fallback";
-renderAll("I’m ready. I’ll ask a few questions and create the datanet live.");
+renderQuestion();
+renderResponse("I’m ready to search for a data opportunity or help you spin up a new one.");
 setupRecognition();

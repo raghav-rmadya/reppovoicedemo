@@ -7,6 +7,7 @@ const screenTitle = document.getElementById("screen-title");
 const screenBody = document.getElementById("screen-body");
 const screenMeta = document.getElementById("screen-meta");
 const screenSummary = document.getElementById("screen-summary");
+const screenCard = document.getElementById("screen-card");
 
 const initialState = {
   stage: "idle",
@@ -37,13 +38,13 @@ const stageContent = {
   },
   searching: {
     label: "Scanning",
-    title: "Looking across Reppo and the broader market.",
-    body: "Hold on while I map the opportunity and decide whether we should spin up a new datanet.",
+    title: "Scanning market",
+    body: "Mapping the opportunity now.",
   },
   search_result: {
     label: "Opportunity",
     title: "This looks like a market worth launching.",
-    body: "I don’t see a clean existing fit, so I’m moving into launch mode.",
+    body: "I don’t see a clean existing fit. I’m moving into launch mode.",
   },
   approve_spinup: {
     label: "Step 1",
@@ -63,12 +64,12 @@ const stageContent = {
   review: {
     label: "Ready",
     title: "Your launch config is ready.",
-    body: "I have the core parameters. Say create if you want me to package the datanet.",
+    body: "Say create when you want me to package the datanet.",
   },
   success: {
-    label: "Created",
-    title: "Datanet creation flow is ready.",
-    body: "The launch package is prepared for the next onchain step.",
+    label: "Launch Ready",
+    title: "Your datanet is packaged.",
+    body: "Launch package locked. Onchain handoff is next.",
   },
 };
 
@@ -78,10 +79,20 @@ function setVoiceStatus(text) {
 
 function setStage(stage) {
   document.body.classList.toggle("processing", stage === "searching");
+  document.body.classList.toggle("success-mode", stage === "success");
   const content = stageContent[stage] || stageContent.idle;
   screenLabel.textContent = content.label;
   screenTitle.textContent = content.title;
   screenBody.textContent = content.body;
+}
+
+function flashStage() {
+  document.body.classList.remove("stage-flash");
+  void screenCard.offsetWidth;
+  document.body.classList.add("stage-flash");
+  window.setTimeout(() => {
+    document.body.classList.remove("stage-flash");
+  }, 450);
 }
 
 function renderSummary() {
@@ -127,9 +138,9 @@ function renderSummary() {
 function renderMeta(meta = []) {
   const defaults =
     state.stage === "idle"
-      ? ["Voice first", "Minimal flow"]
+      ? ["Voice first", "Datanets live", "Agents soon"]
       : state.stage === "searching"
-        ? ["Scanning sources", "Thinking"]
+        ? ["Scanning market", "Preparing launch"]
         : meta;
 
   screenMeta.innerHTML = (defaults || [])
@@ -141,6 +152,24 @@ function renderTurn(response) {
   setStage(state.stage);
   screenBody.textContent = response || stageContent[state.stage]?.body || stageContent.idle.body;
   renderSummary();
+}
+
+function renderProcessingState() {
+  const statusMap = {
+    idle: ["Scanning market", "Preparing launch"],
+    search_result: ["Preparing launch", "Opening config"],
+    approve_spinup: ["Recording approval", "Opening fee config"],
+    publishing_fee: ["Setting publish fee", "Opening emissions"],
+    emissions: ["Packaging datanet", "Preparing handoff"],
+    review: ["Packaging datanet", "Preparing handoff"],
+    success: ["Packaging datanet", "Preparing handoff"],
+  };
+
+  const [title, chip] = statusMap[state.stage] || statusMap.idle;
+  screenLabel.textContent = "Working";
+  screenTitle.textContent = title;
+  screenBody.textContent = "One moment.";
+  renderMeta([title, chip]);
 }
 
 function stopCurrentAudio() {
@@ -194,7 +223,7 @@ async function sendTurn(userText) {
   conversation.push({ role: "user", content: userText });
   setVoiceStatus("Working.");
   setStage("searching");
-  renderMeta(["Scanning intent", "Preparing next step"]);
+  renderProcessingState();
   renderSummary();
 
   const response = await fetch("/api/reppo-turn", {
@@ -222,6 +251,7 @@ async function sendTurn(userText) {
   conversation.push({ role: "assistant", content: data.assistantMessage });
   setVoiceStatus("Ready.");
   setStage(state.stage);
+  flashStage();
   renderMeta(data.meta || []);
   renderTurn(data.assistantMessage);
   speak(data.assistantMessage);

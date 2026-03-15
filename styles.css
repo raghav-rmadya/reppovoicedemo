@@ -80,15 +80,27 @@ input {
 
 .shell {
   position: relative;
-  max-width: 980px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 44px 18px 56px;
+  min-height: 100vh;
+  padding: 18px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .masthead {
-  max-width: 700px;
-  margin: 0 auto 28px;
+  max-width: 320px;
+  margin: 0 auto 14px;
   text-align: center;
+  opacity: 0.96;
+}
+
+.masthead-notes {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .eyebrow,
@@ -109,9 +121,9 @@ p {
 }
 
 h1 {
-  margin-bottom: 14px;
-  font-size: clamp(2.7rem, 6vw, 5.8rem);
-  line-height: 0.92;
+  margin-bottom: 4px;
+  font-size: clamp(1.65rem, 3vw, 2.5rem);
+  line-height: 0.96;
   letter-spacing: -0.05em;
 }
 
@@ -128,27 +140,28 @@ h2 {
 }
 
 .lede {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 .voice-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
-  min-height: 720px;
-  padding: 48px 24px 36px;
-  border-radius: 40px;
+  gap: 18px;
+  min-height: 0;
+  padding: 34px 24px 24px;
+  border-radius: 36px;
   border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(14, 14, 14, 0.9), rgba(8, 8, 8, 0.98));
   box-shadow: var(--shadow);
+  transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
 }
 
 .voice-orb {
   position: relative;
-  width: 230px;
-  height: 230px;
+  width: 260px;
+  height: 260px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -214,28 +227,45 @@ body.processing .orb-core {
 
 .stage-copy {
   text-align: center;
+  margin-top: -4px;
 }
 
 .screen-card {
-  width: min(620px, 100%);
-  padding: 26px 24px;
+  width: min(500px, 100%);
+  padding: 20px 18px;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(21, 21, 21, 0.95), rgba(12, 12, 12, 0.98));
   text-align: center;
+  transition: transform 260ms ease, opacity 260ms ease, border-color 260ms ease;
+  transform-origin: center center;
+}
+
+body.processing .screen-card {
+  transform: scale(0.985);
+  border-color: rgba(130, 174, 252, 0.18);
+}
+
+body.stage-flash .screen-card {
+  animation: stageSwap 420ms ease;
+}
+
+body.stage-flash .voice-stage {
+  animation: stageGlow 420ms ease;
 }
 
 .screen-title {
-  margin-bottom: 12px;
-  font-size: clamp(1.55rem, 3vw, 2.2rem);
+  margin-bottom: 10px;
+  font-size: clamp(1.35rem, 2.7vw, 1.9rem);
   line-height: 1.08;
   letter-spacing: -0.03em;
 }
 
 .screen-body {
-  max-width: 46ch;
+  max-width: 38ch;
   margin: 0 auto;
-  line-height: 1.6;
+  line-height: 1.45;
+  font-size: 0.98rem;
 }
 
 .screen-meta,
@@ -260,6 +290,12 @@ body.processing .orb-core {
   font-size: 0.9rem;
 }
 
+.soon-pill {
+  color: #ffd8dc;
+  border-color: rgba(211, 29, 47, 0.24);
+  background: rgba(211, 29, 47, 0.08);
+}
+
 .summary-pill strong {
   margin-right: 8px;
   color: #fff;
@@ -267,7 +303,7 @@ body.processing .orb-core {
 }
 
 .command-bar {
-  width: min(760px, 100%);
+  width: min(680px, 100%);
   display: flex;
   gap: 10px;
 }
@@ -305,11 +341,26 @@ body.processing .orb-core {
 }
 
 .footnote {
-  max-width: 620px;
+  max-width: 470px;
   margin: 0;
   text-align: center;
-  font-size: 0.95rem;
-  line-height: 1.55;
+  font-size: 0.8rem;
+  line-height: 1.38;
+  opacity: 0.78;
+}
+
+body.success-mode .voice-stage {
+  border-color: rgba(211, 29, 47, 0.22);
+  box-shadow:
+    var(--shadow),
+    0 0 120px rgba(211, 29, 47, 0.12);
+}
+
+body.success-mode .screen-card {
+  border-color: rgba(211, 29, 47, 0.22);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(211, 29, 47, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(21, 21, 21, 0.96), rgba(12, 12, 12, 0.99));
 }
 
 @keyframes pulse {
@@ -336,20 +387,46 @@ body.processing .orb-core {
   }
 }
 
+@keyframes stageSwap {
+  0% {
+    opacity: 0.42;
+    transform: translateY(8px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes stageGlow {
+  0% {
+    box-shadow: var(--shadow);
+  }
+  50% {
+    box-shadow:
+      var(--shadow),
+      0 0 80px rgba(211, 29, 47, 0.12);
+  }
+  100% {
+    box-shadow: var(--shadow);
+  }
+}
+
 @media (max-width: 760px) {
   .shell {
-    padding-top: 24px;
+    min-height: 100vh;
+    justify-content: center;
+    padding-top: 20px;
   }
 
   .voice-stage {
-    min-height: 0;
     padding: 32px 18px 24px;
     gap: 18px;
   }
 
   .voice-orb {
-    width: 190px;
-    height: 190px;
+    width: 210px;
+    height: 210px;
   }
 
   .command-bar {

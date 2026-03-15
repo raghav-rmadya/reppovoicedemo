@@ -1,193 +1,162 @@
 const voiceToggle = document.getElementById("voice-toggle");
 const voiceStatus = document.getElementById("voice-status");
-const voiceName = document.getElementById("voice-name");
-const currentQuestionEl = document.getElementById("current-question");
 const textForm = document.getElementById("text-form");
 const textInput = document.getElementById("text-input");
-const responseText = document.getElementById("response-text");
-const stepList = document.getElementById("step-list");
-const specGrid = document.getElementById("spec-grid");
-const datanetState = document.getElementById("datanet-state");
-const createDatanetButton = document.getElementById("create-datanet");
-const publishEntryButton = document.getElementById("publish-entry");
-const castVoteButton = document.getElementById("cast-vote");
-const workbench = document.getElementById("workbench");
+const screenLabel = document.getElementById("screen-label");
+const screenTitle = document.getElementById("screen-title");
+const screenBody = document.getElementById("screen-body");
+const screenMeta = document.getElementById("screen-meta");
+const screenSummary = document.getElementById("screen-summary");
 
 const initialState = {
-  searchIntent: "",
-  searchSummary: "",
-  searchSources: [],
+  stage: "idle",
   market: "",
+  datasetSummary: "",
   name: "",
-  publishingFee: "",
-  ownerTask: "",
-  emissions: "",
-  rewards: "70% publishers / 20% VeReppo voters / 10% reserve",
-  datasetPlan: "",
-  rlPlan: "",
-  datanetCreated: false,
-  publishes: 0,
-  votes: 0,
-  activity: [],
-  currentQuestion: "Want me to look for an existing dataset opportunity first?",
-  steps: [
-    {
-      title: "Scan the market",
-      body: "Check Reppo and broader web sources for an existing dataset or business opportunity.",
-      status: "active",
-    },
-    {
-      title: "Decide the path",
-      body: "If supply is weak, offer to launch a new datanet.",
-      status: "pending",
-    },
-    {
-      title: "Shape the business",
-      body: "Capture the task, name, publish fee, and launch plan.",
-      status: "pending",
-    },
-    {
-      title: "Prepare launch",
-      body: "Set up the off-chain datanet demo and the onchain business story.",
-      status: "pending",
-    },
-  ],
+  spinupFee: "20k REPPO",
+  publishingFeeAmount: "",
+  publishingFeeToken: "",
+  emissionsAmount: "",
+  emissionsToken: "",
+  transactionStatus: "",
+  currentQuestion: "What market or dataset opportunity do you want to work on?",
 };
 
 let state = JSON.parse(JSON.stringify(initialState));
 let conversation = [];
 let recognition;
 let listening = false;
+let currentAudio;
 
-function showWorkbench() {
-  workbench.classList.remove("hidden");
-}
-
-function renderSteps() {
-  stepList.innerHTML = "";
-  state.steps.forEach((step) => {
-    const row = document.createElement("article");
-    row.className = `step ${step.status}`;
-
-    const dot = document.createElement("span");
-    dot.className = "step-dot";
-
-    const copy = document.createElement("div");
-    const title = document.createElement("p");
-    title.className = "step-title";
-    title.textContent = step.title;
-
-    const body = document.createElement("p");
-    body.className = "step-body";
-    body.textContent = step.body;
-
-    copy.append(title, body);
-    row.append(dot, copy);
-    stepList.append(row);
-  });
-}
-
-function renderSpec() {
-  const specs = [
-    ["Search intent", state.searchIntent || "Not set"],
-    ["Market", state.market || "Not defined yet"],
-    ["Datanet", state.name || "Not named yet"],
-    ["Owner task", state.ownerTask || "Not defined yet"],
-    ["Publishing fee", state.publishingFee || "Not set"],
-    ["Dataset scan", state.searchSummary || "No scan yet"],
-    ["Launch note", "Publishing and voting are coming soon"],
-    ["Best use today", "Spin up new onchain data businesses"],
-  ];
-
-  specGrid.innerHTML = "";
-  specs.forEach(([key, value]) => {
-    const card = document.createElement("article");
-    card.className = "spec-card";
-
-    const label = document.createElement("span");
-    label.className = "spec-key";
-    label.textContent = key;
-
-    const text = document.createElement("p");
-    text.className = "spec-value";
-    text.textContent = value;
-
-    card.append(label, text);
-    specGrid.append(card);
-  });
-}
-
-function renderDatanetState() {
-  datanetState.innerHTML = "";
-
-  const card = document.createElement("article");
-  card.className = "datanet-card";
-
-  const title = document.createElement("h3");
-  title.className = "datanet-title";
-  title.textContent = state.datanetCreated ? state.name : "Opportunity status";
-
-  const body = document.createElement("p");
-  body.className = "step-body";
-  body.textContent = state.datanetCreated
-    ? `${state.name} is prepared as the next onchain data business to spin up.`
-    : state.searchSummary || "AI REPPO is ready to scan Reppo and broader web sources for a data opportunity.";
-
-  const meta = document.createElement("div");
-  meta.className = "datanet-meta";
-  meta.innerHTML = `
-    <span class="mini-pill ${state.datanetCreated ? "good" : ""}">${state.datanetCreated ? "Launch ready" : "Discovery"}</span>
-    <span class="mini-pill">${state.searchSources?.join(" / ") || "reppo.exchange / web"}</span>
-    <span class="mini-pill gold">Publishing + voting soon</span>
-  `;
-
-  card.append(title, body, meta);
-  datanetState.append(card);
-
-  (state.activity || []).slice(0, 4).forEach((item) => {
-    const feed = document.createElement("article");
-    feed.className = "feed-card";
-
-    const feedTitle = document.createElement("p");
-    feedTitle.className = "step-title";
-    feedTitle.textContent = item.title;
-
-    const feedBody = document.createElement("p");
-    feedBody.className = "step-body";
-    feedBody.textContent = item.body;
-
-    feed.append(feedTitle, feedBody);
-    datanetState.append(feed);
-  });
-
-  createDatanetButton.disabled =
-    !state.market || !state.name || !state.publishingFee || !state.ownerTask || state.datanetCreated;
-  publishEntryButton.disabled = true;
-  castVoteButton.disabled = true;
-}
-
-function renderResponse(text) {
-  responseText.textContent = text;
-}
-
-function renderQuestion() {
-  currentQuestionEl.textContent = state.currentQuestion || "What do you want to do next?";
-}
-
-function renderAll(response) {
-  showWorkbench();
-  renderResponse(response);
-  renderQuestion();
-  renderSteps();
-  renderSpec();
-  renderDatanetState();
-}
+const stageContent = {
+  idle: {
+    label: "Ready",
+    title: "What do you want to work on?",
+    body:
+      "Say a market or ask me to look for a dataset opportunity. If the market looks open, I’ll spin up a new datanet flow.",
+  },
+  searching: {
+    label: "Scanning",
+    title: "Looking across Reppo and the broader market.",
+    body: "Hold on while I map the opportunity and decide whether we should spin up a new datanet.",
+  },
+  search_result: {
+    label: "Opportunity",
+    title: "This looks like a market worth launching.",
+    body: "I don’t see a clean existing fit, so I’m moving into launch mode.",
+  },
+  approve_spinup: {
+    label: "Step 1",
+    title: "Approve the spin-up fee.",
+    body: "Please approve 20k REPPO so I can prepare the new datanet.",
+  },
+  publishing_fee: {
+    label: "Step 2",
+    title: "Set the publishing fee.",
+    body: "What should publishers pay to submit data, and which token do you want to charge in?",
+  },
+  emissions: {
+    label: "Step 3",
+    title: "Seed emissions.",
+    body: "How much emissions do you want to seed, and in which token?",
+  },
+  review: {
+    label: "Ready",
+    title: "Your launch config is ready.",
+    body: "I have the core parameters. Say create if you want me to package the datanet.",
+  },
+  success: {
+    label: "Created",
+    title: "Datanet creation flow is ready.",
+    body: "The launch package is prepared for the next onchain step.",
+  },
+};
 
 function setVoiceStatus(text) {
   voiceStatus.textContent = text;
 }
 
+function setStage(stage) {
+  document.body.classList.toggle("processing", stage === "searching");
+  const content = stageContent[stage] || stageContent.idle;
+  screenLabel.textContent = content.label;
+  screenTitle.textContent = content.title;
+  screenBody.textContent = content.body;
+}
+
+function renderSummary() {
+  const pills = [];
+
+  if (state.market) {
+    pills.push(["Market", state.market]);
+  }
+  if (state.name) {
+    pills.push(["Datanet", state.name]);
+  }
+  if (state.spinupFee && state.stage !== "idle" && state.stage !== "searching") {
+    pills.push(["Spin-up", state.spinupFee]);
+  }
+  if (state.publishingFeeAmount || state.publishingFeeToken) {
+    pills.push([
+      "Publish fee",
+      `${state.publishingFeeAmount || "?"} ${state.publishingFeeToken || ""}`.trim(),
+    ]);
+  }
+  if (state.emissionsAmount || state.emissionsToken) {
+    pills.push([
+      "Seed",
+      `${state.emissionsAmount || "?"} ${state.emissionsToken || ""}`.trim(),
+    ]);
+  }
+
+  if (pills.length === 0) {
+    screenSummary.classList.add("hidden");
+    screenSummary.innerHTML = "";
+    return;
+  }
+
+  screenSummary.classList.remove("hidden");
+  screenSummary.innerHTML = pills
+    .map(
+      ([key, value]) =>
+        `<span class="summary-pill"><strong>${key}</strong>${value}</span>`
+    )
+    .join("");
+}
+
+function renderMeta(meta = []) {
+  const defaults =
+    state.stage === "idle"
+      ? ["Voice first", "Minimal flow"]
+      : state.stage === "searching"
+        ? ["Scanning sources", "Thinking"]
+        : meta;
+
+  screenMeta.innerHTML = (defaults || [])
+    .map((item) => `<span class="meta-pill">${item}</span>`)
+    .join("");
+}
+
+function renderTurn(response) {
+  setStage(state.stage);
+  screenBody.textContent = response || stageContent[state.stage]?.body || stageContent.idle.body;
+  renderSummary();
+}
+
+function stopCurrentAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    URL.revokeObjectURL(currentAudio.dataset.url || "");
+    currentAudio = null;
+  }
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
 async function speak(text) {
+  stopCurrentAudio();
+
   try {
     const response = await fetch("/api/reppo-speech", {
       method: "POST",
@@ -202,22 +171,31 @@ async function speak(text) {
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    audio.dataset.url = audioUrl;
+    currentAudio = audio;
     audio.play();
-    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      if (currentAudio === audio) {
+        currentAudio = null;
+      }
+    };
   } catch (_error) {
     if ("speechSynthesis" in window) {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.02;
-      utterance.pitch = 0.96;
-      window.speechSynthesis.cancel();
+      utterance.rate = 1.03;
+      utterance.pitch = 0.97;
       window.speechSynthesis.speak(utterance);
     }
   }
 }
 
 async function sendTurn(userText) {
-  showWorkbench();
   conversation.push({ role: "user", content: userText });
+  setVoiceStatus("Working.");
+  setStage("searching");
+  renderMeta(["Scanning intent", "Preparing next step"]);
+  renderSummary();
 
   const response = await fetch("/api/reppo-turn", {
     method: "POST",
@@ -233,14 +211,19 @@ async function sendTurn(userText) {
 
   if (!response.ok) {
     const message = data?.message || data?.details || data?.error || "Something went wrong.";
-    renderResponse(message);
+    setStage(state.stage || "idle");
+    renderMeta(["Request failed"]);
+    screenBody.textContent = message;
     setVoiceStatus(message.includes("OPENAI_API_KEY") ? "Add OPENAI_API_KEY in Vercel." : "Request failed.");
     return;
   }
 
   state = data.state;
   conversation.push({ role: "assistant", content: data.assistantMessage });
-  renderAll(data.assistantMessage);
+  setVoiceStatus("Ready.");
+  setStage(state.stage);
+  renderMeta(data.meta || []);
+  renderTurn(data.assistantMessage);
   speak(data.assistantMessage);
 }
 
@@ -281,7 +264,9 @@ function setupRecognition() {
   recognition.onend = () => {
     listening = false;
     document.body.classList.remove("listening");
-    setVoiceStatus("Idle. Click the orb to continue.");
+    if (!document.body.classList.contains("processing")) {
+      setVoiceStatus("Idle. Click the orb, then talk.");
+    }
   };
 }
 
@@ -309,19 +294,7 @@ textForm.addEventListener("submit", async (event) => {
   await sendTurn(text);
 });
 
-createDatanetButton.addEventListener("click", async () => {
-  await sendTurn("Create the new datanet now.");
-});
-
-publishEntryButton.addEventListener("click", async () => {
-  await sendTurn("Tell me when publishing is available.");
-});
-
-castVoteButton.addEventListener("click", async () => {
-  await sendTurn("Tell me when voting is available.");
-});
-
-voiceName.textContent = "OpenAI TTS with browser fallback";
-renderQuestion();
-renderResponse("I’m ready to search for a data opportunity or help you spin up a new one.");
+setStage(state.stage);
+renderMeta();
+renderSummary();
 setupRecognition();

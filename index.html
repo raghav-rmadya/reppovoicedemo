@@ -22,13 +22,13 @@
     <main class="shell">
       <header class="masthead">
         <p class="eyebrow">AI REPPO</p>
-        <h1>Interact with the Reppo ecosystem using your voice.</h1>
+        <h1>Interact with Reppo using your voice.</h1>
         <p class="lede">
-          AI REPPO helps you discover existing data businesses, search for dataset opportunities, and spin up new onchain data businesses when the market needs one.
+          Ask for a market, a dataset opportunity, or a new onchain data business.
         </p>
       </header>
 
-      <section class="orb-room">
+      <section class="voice-stage">
         <button id="voice-toggle" class="voice-orb" aria-label="Activate AI REPPO">
           <span class="orb-core"></span>
           <span class="orb-ring orb-ring-a"></span>
@@ -36,65 +36,40 @@
           <span class="orb-ring orb-ring-c"></span>
         </button>
 
-        <div class="orb-copy">
-          <p class="orb-kicker">Operator</p>
+        <div class="stage-copy">
+          <p class="stage-kicker">Voice Operator</p>
           <h2>AI REPPO</h2>
           <p id="voice-status" class="voice-status">
-            Idle. Click the orb, then say “Hey Reppo” or just start talking.
+            Idle. Click the orb, then talk.
           </p>
-          <div class="prompt-hint">
-            <span class="prompt-hint-label">Current question</span>
-            <p id="current-question" class="current-question">
-              Want me to look for an existing dataset opportunity first?
-            </p>
-          </div>
         </div>
+
+        <section id="screen-card" class="screen-card" aria-live="polite">
+          <p id="screen-label" class="screen-label">Ready</p>
+          <h3 id="screen-title" class="screen-title">What do you want to work on?</h3>
+          <p id="screen-body" class="screen-body">
+            Say a market or ask me to look for a dataset opportunity. If the market looks open, I’ll spin up a new datanet flow.
+          </p>
+          <div id="screen-meta" class="screen-meta">
+            <span class="meta-pill">Voice first</span>
+            <span class="meta-pill">Minimal flow</span>
+          </div>
+          <div id="screen-summary" class="screen-summary hidden"></div>
+        </section>
 
         <form id="text-form" class="command-bar">
           <input
             id="text-input"
             type="text"
             autocomplete="off"
-            placeholder='Try: "Search EV charging datasets" or "Spin up a new datanet for robotics."'
+            placeholder='Try: "Search EV charging datasets" or "Create a datanet for drone telemetry."'
           />
           <button type="submit">Send</button>
         </form>
-      </section>
 
-      <section id="workbench" class="workbench hidden">
-        <div class="panel response-panel">
-          <p class="panel-label">Response</p>
-          <p id="response-text" class="response-text">
-            I’m ready to help you discover or launch a new data business.
-          </p>
-          <p class="product-note">
-            Publishing and voting are coming soon. Right now AI REPPO is best at helping spin up new onchain data businesses.
-          </p>
-          <div class="voice-row">
-            <span class="voice-chip">Voice</span>
-            <span id="voice-name" class="voice-name">Natural system voice if available</span>
-          </div>
-        </div>
-
-        <div class="panel steps-panel">
-          <p class="panel-label">Opportunity Map</p>
-          <div id="step-list" class="step-list"></div>
-        </div>
-
-        <div class="panel spec-panel">
-          <p class="panel-label">Launch Spec</p>
-          <div id="spec-grid" class="spec-grid"></div>
-        </div>
-
-        <div class="panel datanet-panel">
-          <p class="panel-label">Live Datanet</p>
-          <div id="datanet-state" class="datanet-state"></div>
-          <div class="action-grid">
-            <button id="create-datanet" class="secondary-action">Create datanet</button>
-            <button id="publish-entry" class="secondary-action">Publish input</button>
-            <button id="cast-vote" class="secondary-action">Record vote</button>
-          </div>
-        </div>
+        <p class="footnote">
+          Publishing and voting are coming soon. Right now AI REPPO is best at helping spin up new onchain data businesses.
+        </p>
       </section>
     </main>
 

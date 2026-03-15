@@ -1,4 +1,4 @@
-onst OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 const SYSTEM_PROMPT = `
 You are AI REPPO, a concise, confident, voice-first operator for the Reppo ecosystem.

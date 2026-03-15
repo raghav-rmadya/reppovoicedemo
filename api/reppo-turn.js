@@ -1,154 +1,136 @@
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 const SYSTEM_PROMPT = `
-You are AI REPPO, a concise voice-first operator for the Reppo ecosystem.
+You are AI REPPO, a concise, confident, voice-first operator for the Reppo ecosystem.
 
-Core positioning:
-- Lead with discovery first.
-- Start by asking whether the user wants to search for an existing dataset or opportunity in the Reppo ecosystem.
-- You can describe this as looking across reppo.exchange and broader web sources in demo mode.
-- If you find a weak or missing market, enthusiastically offer to spin up a new datanet.
-- A datanet is a tokenized RL environment where the task is defined by the datanet owner, the inputs come from data publishers, and the verifiers are VeReppo voters.
-- If asked about publishing or voting, say those abilities are coming soon, and right now you are best at helping spin up new onchain data businesses.
+Core behavior:
+- Keep replies short, natural, and strong for spoken playback.
+- The experience should feel like a premium launch assistant, not a dashboard.
+- Do not overexplain unless asked.
+- If the user asks side questions, answer briefly, then return to the launch flow.
 
-Your conversational style:
-- natural, sharp, enthusiastic, not robotic
-- short answers for spoken playback
-- answer side questions naturally, including "what's your name?"
-- never dump jargon unless asked
+Product framing:
+- Start from the user's market or dataset request.
+- You can say you scan reppo.exchange and the broader market in demo mode.
+- If the market looks open or underserved, confidently move into creating a new datanet.
+- A datanet is a tokenized RL environment where the owner defines the task and data publishers provide inputs.
+- If asked about publishing or voting, say those capabilities are coming soon.
+- Right now, AI REPPO is best at helping spin up new onchain data businesses.
 
-Your tasks:
-- help the user search for an existing opportunity
-- summarize whether the opportunity seems served or underserved
-- if underserved, gather:
-  1. market
-  2. datanet name
-  3. publishing fee
-  4. owner-defined task
-- once these are known, prepare a launch-ready datanet
+Desired flow:
+1. Understand the market or dataset opportunity.
+2. Briefly say what you found.
+3. Move to a clean step-by-step launch flow.
+4. Ask for:
+   - approval of the 20k REPPO spin-up fee
+   - publishing fee amount and token
+   - emissions seed amount and token
+5. Once those are known, say the datanet creation flow is ready.
 
 Return strictly valid JSON matching the schema.
 `;
 
-function mergeState(current, patch = {}) {
-  return {
-    ...current,
-    ...patch,
-    activity: Array.isArray(current.activity) ? [...current.activity] : [],
+const STAGE_ORDER = [
+  "idle",
+  "search_result",
+  "approve_spinup",
+  "publishing_fee",
+  "emissions",
+  "review",
+  "success",
+];
+
+function normalizeState(current = {}, patch = {}) {
+  const next = {
+    stage: current.stage || "idle",
+    market: current.market || "",
+    datasetSummary: current.datasetSummary || "",
+    name: current.name || "",
+    spinupFee: current.spinupFee || "20k REPPO",
+    publishingFeeAmount: current.publishingFeeAmount || "",
+    publishingFeeToken: current.publishingFeeToken || "",
+    emissionsAmount: current.emissionsAmount || "",
+    emissionsToken: current.emissionsToken || "",
+    transactionStatus: current.transactionStatus || "",
+    currentQuestion: current.currentQuestion || "What market or dataset opportunity do you want to work on?",
   };
-}
 
-function buildSteps(state) {
-  const steps = [
-    {
-      title: "Scan the market",
-      body: "Check Reppo and broader web sources for an existing dataset or business opportunity.",
-      status: "active",
-    },
-    {
-      title: "Decide the path",
-      body: "If supply is weak, offer to launch a new datanet.",
-      status: "pending",
-    },
-    {
-      title: "Shape the business",
-      body: "Capture the task, name, publish fee, and launch plan.",
-      status: "pending",
-    },
-    {
-      title: "Prepare launch",
-      body: "Set up the off-chain datanet demo and the onchain business story.",
-      status: "pending",
-    },
-  ];
-
-  if (state.searchSummary) {
-    steps[0].status = "done";
-    steps[1].status = "active";
-    steps[1].body = state.searchSummary;
+  for (const [key, value] of Object.entries(patch)) {
+    next[key] = typeof value === "string" ? value : next[key];
   }
 
-  if (state.market || state.name || state.publishingFee || state.ownerTask) {
-    steps[2].status = "active";
-    const captured = [
-      state.market ? "market" : null,
-      state.name ? "name" : null,
-      state.publishingFee ? "publish fee" : null,
-      state.ownerTask ? "task" : null,
-    ].filter(Boolean);
-    if (captured.length) {
-      steps[2].body = `Captured: ${captured.join(", ")}.`;
-    }
-  }
-
-  if (state.market && state.name && state.publishingFee && state.ownerTask) {
-    steps[2].status = "done";
-    steps[3].status = "active";
-    steps[3].body = state.datanetCreated
-      ? `${state.name} is prepared as a launch-ready onchain data business.`
-      : "Everything is ready. AI REPPO can spin up the new data business now.";
-  }
-
-  return steps;
-}
-
-function buildNextQuestion(state, fallback) {
-  if (fallback) {
-    return fallback;
-  }
-  if (!state.searchIntent) {
-    return "Want me to look for an existing dataset opportunity first?";
-  }
-  if (!state.searchSummary) {
-    return "What market should I scan?";
-  }
-  if (!state.market) {
-    return "What market should this new datanet serve?";
-  }
-  if (!state.name) {
-    return "What do you want to name it?";
-  }
-  if (!state.publishingFee) {
-    return "How much should publishers pay to contribute data?";
-  }
-  if (!state.ownerTask) {
-    return "What task should this datanet optimize for?";
-  }
-  return "I have enough. Want me to prepare the new data business?";
-}
-
-function executeActions(state, actions = []) {
-  const next = mergeState(state);
-
-  for (const action of actions) {
-    if (!action || !action.type || action.type === "none") {
-      continue;
-    }
-
-    if (action.type === "search_sources") {
-      next.searchIntent = next.searchIntent || "Discovery first";
-      next.searchSources = ["reppo.exchange", "broader web"];
-      next.searchSummary =
-        action.summary ||
-        `In demo mode, AI REPPO scanned reppo.exchange and broader web sources for ${String(next.market || "the requested market").toLowerCase()}.`;
-      next.activity.unshift({
-        title: "Opportunity scan",
-        body: next.searchSummary,
-      });
-    }
-
-    if (action.type === "create_datanet" && !next.datanetCreated) {
-      next.datanetCreated = true;
-      next.activity.unshift({
-        title: "Launch plan prepared",
-        body: `${next.name} is positioned as the next onchain data business to spin up.`,
-      });
-    }
-  }
-
-  next.steps = buildSteps(next);
-  next.currentQuestion = buildNextQuestion(next);
   return next;
+}
+
+function buildNameFromMarket(market) {
+  if (!market) {
+    return "";
+  }
+  return market
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join("");
+}
+
+function computeStage(state) {
+  if (state.transactionStatus === "ready") {
+    return "success";
+  }
+  if (state.publishingFeeAmount && state.publishingFeeToken && state.emissionsAmount && state.emissionsToken) {
+    return "review";
+  }
+  if (state.publishingFeeAmount && state.publishingFeeToken) {
+    return "emissions";
+  }
+  if (state.transactionStatus === "approved") {
+    return "publishing_fee";
+  }
+  if (state.datasetSummary) {
+    return "approve_spinup";
+  }
+  if (state.market) {
+    return "search_result";
+  }
+  return "idle";
+}
+
+function buildQuestion(state) {
+  switch (state.stage) {
+    case "search_result":
+      return "This looks open. Want me to spin up a new datanet?";
+    case "approve_spinup":
+      return `Please approve ${state.spinupFee}.`;
+    case "publishing_fee":
+      return "What publishing fee do you want to set, and in which token?";
+    case "emissions":
+      return "How much emissions do you want to seed, and in which token?";
+    case "review":
+      return "I have the config. Say create when you want me to package it.";
+    case "success":
+      return "Your datanet flow is ready for the next onchain step.";
+    default:
+      return "What market or dataset opportunity do you want to work on?";
+  }
+}
+
+function buildMeta(state) {
+  switch (state.stage) {
+    case "search_result":
+      return ["Opportunity found", "Moving into launch"];
+    case "approve_spinup":
+      return [state.market || "Market set", state.spinupFee];
+    case "publishing_fee":
+      return [state.name || "Datanet named", "Fee config"];
+    case "emissions":
+      return ["Launch economics", "Seed incentives"];
+    case "review":
+      return ["Config complete", "Ready to create"];
+    case "success":
+      return ["Launch package prepared", "Off-chain demo ready"];
+    default:
+      return ["Voice first", "Minimal flow"];
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -168,8 +150,47 @@ module.exports = async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const userText = body?.userText || "";
-    const currentState = body?.state || {};
+    const currentState = normalizeState(body?.state || {});
     const conversation = Array.isArray(body?.conversation) ? body.conversation.slice(-8) : [];
+
+    const schema = {
+      name: "reppo_turn",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          assistant_message: { type: "string" },
+          state_patch: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              market: { type: "string" },
+              datasetSummary: { type: "string" },
+              name: { type: "string" },
+              spinupFee: { type: "string" },
+              publishingFeeAmount: { type: "string" },
+              publishingFeeToken: { type: "string" },
+              emissionsAmount: { type: "string" },
+              emissionsToken: { type: "string" },
+              transactionStatus: { type: "string" }
+            },
+            required: [
+              "market",
+              "datasetSummary",
+              "name",
+              "spinupFee",
+              "publishingFeeAmount",
+              "publishingFeeToken",
+              "emissionsAmount",
+              "emissionsToken",
+              "transactionStatus"
+            ]
+          }
+        },
+        required: ["assistant_message", "state_patch"]
+      }
+    };
 
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
@@ -181,68 +202,8 @@ module.exports = async function handler(req, res) {
         role: message.role === "assistant" ? "assistant" : "user",
         content: String(message.content || ""),
       })),
-      {
-        role: "user",
-        content: userText,
-      },
+      { role: "user", content: userText },
     ];
-
-    const schema = {
-      name: "reppo_turn",
-      strict: true,
-      schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          assistant_message: { type: "string" },
-          next_question: { type: "string" },
-          state_patch: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              searchIntent: { type: "string" },
-              searchSummary: { type: "string" },
-              market: { type: "string" },
-              name: { type: "string" },
-              publishingFee: { type: "string" },
-              ownerTask: { type: "string" },
-              emissions: { type: "string" },
-              rewards: { type: "string" },
-              datasetPlan: { type: "string" },
-              rlPlan: { type: "string" }
-            },
-            required: [
-              "searchIntent",
-              "searchSummary",
-              "market",
-              "name",
-              "publishingFee",
-              "ownerTask",
-              "emissions",
-              "rewards",
-              "datasetPlan",
-              "rlPlan"
-            ]
-          },
-          actions: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                type: {
-                  type: "string",
-                  enum: ["none", "search_sources", "create_datanet"]
-                },
-                summary: { type: "string" }
-              },
-              required: ["type", "summary"]
-            }
-          }
-        },
-        required: ["assistant_message", "next_question", "state_patch", "actions"]
-      }
-    };
 
     const openaiResponse = await fetch(OPENAI_API_URL, {
       method: "POST",
@@ -270,18 +231,28 @@ module.exports = async function handler(req, res) {
     const content = completion?.choices?.[0]?.message?.content;
     const parsed = JSON.parse(content);
 
-    const patchedState = {
-      ...currentState,
-      ...parsed.state_patch,
-    };
-    const nextState = executeActions(patchedState, parsed.actions);
-    nextState.currentQuestion = buildNextQuestion(nextState, parsed.next_question);
+    const nextState = normalizeState(currentState, parsed.state_patch);
+
+    if (!nextState.spinupFee) {
+      nextState.spinupFee = "20k REPPO";
+    }
+
+    if (!nextState.name && nextState.market) {
+      nextState.name = `${buildNameFromMarket(nextState.market)}Net`;
+    }
+
+    nextState.stage = computeStage(nextState);
+    nextState.currentQuestion = buildQuestion(nextState);
+
+    if (!STAGE_ORDER.includes(nextState.stage)) {
+      nextState.stage = "idle";
+      nextState.currentQuestion = buildQuestion(nextState);
+    }
 
     res.status(200).json({
       assistantMessage: parsed.assistant_message,
-      nextQuestion: nextState.currentQuestion,
       state: nextState,
-      actions: parsed.actions,
+      meta: buildMeta(nextState),
     });
   } catch (error) {
     res.status(500).json({

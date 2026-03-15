@@ -95,6 +95,30 @@ const stageContent = {
   },
 };
 
+const instantFaqs = [
+  {
+    match: /what('?| i)s reppo|tell me what reppo is about|what is reppo about/i,
+    answer:
+      "Reppo is a network for AI training data powered by prediction markets. It aligns publishers, VeReppo voters, and subnet owners to create high-quality domain-specific data.",
+    title: "What Reppo is",
+    meta: ["Instant answer", "Reppo overview"],
+  },
+  {
+    match: /what problem does reppo solve|why does reppo exist/i,
+    answer:
+      "Reppo solves the AI training data bottleneck. It creates economic coordination around scarce, high-quality data instead of relying on opaque vendor pipelines.",
+    title: "Why Reppo exists",
+    meta: ["Instant answer", "Problem statement"],
+  },
+  {
+    match: /what is a datanet|define datanet/i,
+    answer:
+      "A datanet is a tokenized RL environment where the owner defines the task, publishers supply inputs, and VeReppo voters help validate quality.",
+    title: "What a datanet is",
+    meta: ["Instant answer", "Datanet overview"],
+  },
+];
+
 function setVoiceStatus(text) {
   voiceStatus.textContent = text;
 }
@@ -180,9 +204,9 @@ function renderReasoning() {
 function renderMeta(meta = []) {
   const defaults =
     state.stage === "idle"
-      ? ["Voice first", "Datanets live", "Agents soon"]
+      ? ["Datanets live", "Agent flow coming soon"]
       : state.stage === "searching"
-        ? ["Scanning market", "Preparing launch"]
+        ? ["Thinking", "Processing request"]
         : meta;
 
   screenMeta.innerHTML = (defaults || [])
@@ -199,7 +223,7 @@ function renderTurn(response) {
 
 function renderProcessingState() {
   const statusMap = {
-    idle: ["Scanning market", "Preparing launch"],
+    idle: ["Thinking", "Processing request"],
     search_result: ["Preparing launch", "Opening config"],
     launch_intro: ["Creating datanet", "Opening config"],
     approve_spinup: ["Recording approval", "Opening fee config"],
@@ -260,6 +284,11 @@ function getProcessingState(userText) {
   return null;
 }
 
+function getInstantFaq(userText) {
+  const text = String(userText || "").trim();
+  return instantFaqs.find((item) => item.match.test(text)) || null;
+}
+
 function stopCurrentAudio() {
   if (currentAudio) {
     currentAudio.pause();
@@ -308,6 +337,23 @@ async function speak(text) {
 }
 
 async function sendTurn(userText) {
+  const instantFaq = getInstantFaq(userText);
+  if (instantFaq) {
+    state.stage = "idle";
+    state.mode = "chat";
+    state.reasoning = "";
+    setVoiceStatus("Ready.");
+    setStage("idle");
+    screenLabel.textContent = "Answer";
+    screenTitle.textContent = instantFaq.title;
+    screenBody.textContent = instantFaq.answer;
+    renderMeta(instantFaq.meta);
+    renderSummary();
+    renderReasoning();
+    speak(instantFaq.answer);
+    return;
+  }
+
   conversation.push({ role: "user", content: userText });
   setVoiceStatus("Thinking.");
   document.body.classList.add("processing");

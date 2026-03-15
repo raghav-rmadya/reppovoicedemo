@@ -10,6 +10,7 @@ const screenSummary = document.getElementById("screen-summary");
 const screenCard = document.getElementById("screen-card");
 const reasoningBlock = document.getElementById("reasoning-block");
 const reasoningText = document.getElementById("reasoning-text");
+const promptButtons = document.querySelectorAll("[data-prompt]");
 
 const initialState = {
   stage: "idle",
@@ -99,7 +100,7 @@ const instantFaqs = [
   {
     match: /what('?| i)s reppo|tell me what reppo is about|what is reppo about/i,
     answer:
-      "Reppo is a network for AI training data powered by prediction markets. It aligns publishers, VeReppo voters, and subnet owners to create high-quality domain-specific data.",
+      "Reppo is a network for AI training data powered by prediction markets. It aligns publishers, VeReppo voters, and datanet owners to create onchain data businesses.",
     title: "What Reppo is",
     meta: ["Instant answer", "Reppo overview"],
   },
@@ -113,9 +114,16 @@ const instantFaqs = [
   {
     match: /what is a datanet|define datanet/i,
     answer:
-      "A datanet is a tokenized RL environment where the owner defines the task, publishers supply inputs, and VeReppo voters help validate quality.",
+      "A datanet is an onchain business for AI training data. The datanet owner defines the task, publishers supply inputs, and VeReppo voters help validate quality.",
     title: "What a datanet is",
     meta: ["Instant answer", "Datanet overview"],
+  },
+  {
+    match: /how do i start publishing and voting|start publishing and voting|how can i publish|how can i vote/i,
+    answer:
+      "Publishing and voting are not live through this flow yet. You can use ReppoAgent on ACP or on X today, while AI REPPO here is focused on spinning up datanets.",
+    title: "Publishing and voting",
+    meta: ["Instant answer", "Use ReppoAgent"],
   },
 ];
 
@@ -468,6 +476,16 @@ textForm.addEventListener("submit", async (event) => {
 
   textInput.value = "";
   await sendTurn(text);
+});
+
+promptButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    const prompt = button.getAttribute("data-prompt");
+    if (!prompt) {
+      return;
+    }
+    await sendTurn(prompt);
+  });
 });
 
 setStage(state.stage);

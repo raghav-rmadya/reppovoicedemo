@@ -1,4 +1,4 @@
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+onst OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 const SYSTEM_PROMPT = `
 You are AI REPPO, a concise, confident, voice-first operator for the Reppo ecosystem.
@@ -16,9 +16,15 @@ Product framing:
 - Do not move into datanet creation unless the user explicitly asks to create, spin up, or launch a datanet.
 - If the market looks open or underserved before the user asks to create, explain what you found and ask whether they want to create a datanet.
 - A datanet is a tokenized RL environment where the owner defines the task and data publishers provide inputs.
+- Reppo is the network for AI training data, powered by prediction markets.
+- Reppo coordinates publishers, voters, subnet owners, and solver nodes around the creation of high-quality AI training data.
+- Reppo is solving the AI training data bottleneck: scarcity of high-quality domain-specific data, weak incentive alignment, and opaque vendor-driven data supply.
+- Publishers contribute raw or source data. Voters lock REPPO to get VeReppo and curate or validate data through economically aligned participation.
+- Reppo subnets act like on-demand data factories for AI models, agents, robotics, and other large-scale AI systems.
 - If asked about publishing or voting, say those capabilities are coming soon.
 - If asked about agents, say an agent-specific flow is coming soon.
 - Right now, AI REPPO is best at helping spin up new onchain data businesses.
+- In this demo, tell users that 50% of the spin-up fee is locked until the datanet is live and the other 50% is paid to the network.
 
 Desired flow:
 1. Understand the market or dataset opportunity.
@@ -27,15 +33,22 @@ Desired flow:
 4. Then ask for:
    - approval of the 20k REPPO spin-up fee
    - publishing fee amount and token
-   - emissions seed amount and token
-5. Once those are known, say the datanet creation flow is ready.
-6. Keep every turn crisp enough to sound premium over voice.
-7. Prefer concise operator-style phrasing like:
+   - emissions allocation per epoch and token
+   - whether to enable emissions contribution in exchange for fee share
+5. Once those are known, ask the user to deploy the datanet.
+6. After the user says deploy, present the datanet as deployed and ready for publishers and VeReppo voters.
+7. Keep every turn crisp enough to sound premium over voice.
+8. Prefer concise operator-style phrasing like:
    - "Market looks open. I'm moving into launch mode."
    - "Approved. Now set the publishing fee."
-   - "Good. Now seed emissions."
-   - "Locked. Your datanet is packaged."
-8. If the user says "approved" during launch mode, treat that as approving the demo spin-up fee and move to the next configuration step.
+   - "Good. Now set emissions per epoch."
+   - "Good. Now decide whether to enable emissions contribution for fee share."
+   - "Locked. Say deploy datanet."
+   - "Deployed. The market is open."
+9. If the user says "approved" during launch mode, treat that as approving the demo spin-up fee and move to the next configuration step.
+10. If the user asks "what dataset is most valuable to crowdsource right now" or similar, answer in one of two ways:
+   - If you have concrete live research context in the conversation, give a researched answer with reasoning.
+   - Otherwise, say this should be handled as a live research task across Reppo demand, broader AI market demand, and domain-specific scarcity signals, then give a short high-conviction directional answer with clear uncertainty.
 
 Return strictly valid JSON matching the schema.
 `;
@@ -47,7 +60,9 @@ const STAGE_ORDER = [
   "approve_spinup",
   "publishing_fee",
   "emissions",
+  "contribution_share",
   "review",
+  "deploy_pending",
   "success",
 ];
 
@@ -64,6 +79,9 @@ function normalizeState(current = {}, patch = {}) {
     publishingFeeToken: current.publishingFeeToken || "",
     emissionsAmount: current.emissionsAmount || "",
     emissionsToken: current.emissionsToken || "",
+    emissionsPerEpoch: current.emissionsPerEpoch || "",
+    contributionShareEnabled: current.contributionShareEnabled || "",
+    contributionShareRate: current.contributionShareRate || "",
     transactionStatus: current.transactionStatus || "",
     currentQuestion: current.currentQuestion || "What market or dataset opportunity do you want to work on?",
   };
@@ -90,11 +108,28 @@ function computeStage(state) {
   if (state.transactionStatus === "ready") {
     return "success";
   }
+  if (state.transactionStatus === "deploying") {
+    return "deploy_pending";
+  }
   if (state.mode !== "launch") {
     return state.market || state.datasetSummary ? "search_result" : "idle";
   }
-  if (state.publishingFeeAmount && state.publishingFeeToken && state.emissionsAmount && state.emissionsToken) {
+  if (
+    state.publishingFeeAmount &&
+    state.publishingFeeToken &&
+    state.emissionsPerEpoch &&
+    state.emissionsToken &&
+    state.contributionShareEnabled
+  ) {
     return "review";
+  }
+  if (
+    state.publishingFeeAmount &&
+    state.publishingFeeToken &&
+    state.emissionsPerEpoch &&
+    state.emissionsToken
+  ) {
+    return "contribution_share";
   }
   if (state.publishingFeeAmount && state.publishingFeeToken) {
     return "emissions";
@@ -125,11 +160,15 @@ function buildQuestion(state) {
     case "publishing_fee":
       return "What publishing fee do you want to set, and in which token?";
     case "emissions":
-      return "How much emissions do you want to seed, and in which token?";
+      return "How much emissions do you want to allocate per epoch, and in which token?";
+    case "contribution_share":
+      return "Do you want to enable emissions contribution in exchange for fee share?";
     case "review":
-      return "I have the config. Say create when you want me to package it.";
+      return "I have the config. Say deploy datanet when you want me to launch it.";
+    case "deploy_pending":
+      return "Deploying the datanet now.";
     case "success":
-      return "Your datanet flow is ready for the next onchain step.";
+      return "Deployed. The market is open for publishers and VeReppo voters.";
     default:
       return "What market or dataset opportunity do you want to work on?";
   }
@@ -147,10 +186,14 @@ function buildMeta(state) {
       return [state.name || "Datanet named", "Fee config"];
     case "emissions":
       return ["Launch economics", "Seed incentives"];
+    case "contribution_share":
+      return ["Fee share", "Contribution incentives"];
     case "review":
-      return ["Config complete", "Ready to create"];
+      return ["Config complete", "Ready to deploy"];
+    case "deploy_pending":
+      return ["Deploying datanet", "Opening market"];
     case "success":
-      return ["Launch package prepared", "Onchain handoff next"];
+      return ["Datanet deployed", "Publishers and voters ready"];
     default:
       return ["Voice first", "Datanets live", "Agents soon"];
   }
@@ -198,6 +241,9 @@ module.exports = async function handler(req, res) {
               publishingFeeToken: { type: "string" },
               emissionsAmount: { type: "string" },
               emissionsToken: { type: "string" },
+              emissionsPerEpoch: { type: "string" },
+              contributionShareEnabled: { type: "string" },
+              contributionShareRate: { type: "string" },
               transactionStatus: { type: "string" }
             },
             required: [
@@ -211,6 +257,9 @@ module.exports = async function handler(req, res) {
               "publishingFeeToken",
               "emissionsAmount",
               "emissionsToken",
+              "emissionsPerEpoch",
+              "contributionShareEnabled",
+              "contributionShareRate",
               "transactionStatus"
             ]
           }
